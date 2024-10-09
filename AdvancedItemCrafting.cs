@@ -1991,7 +1991,7 @@ namespace Oxide.Plugins
         
         public void SelectKitPanel(ExtendedCuiElementContainer builder, BasePlayer player, string parent, int height, BaseItem itemToMod, List<Perk> selectedKits, int maxKits, string action)
         {
-            builder.Add(new CuiElement { Name = "SELECT_KIT_BACKDROP", Parent = parent, Components = { new CuiRawImageComponent { Color = "0 0 0 0.5", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0.5 0.5", AnchorMax = "0.5 0.5", OffsetMin = $"206 -{height}", OffsetMax = $"410 {height}" } } });
+            builder.Add(new CuiElement { Name = "SELECT_KIT_BACKDROP", Parent = parent, Components = { new CuiRawImageComponent { Color = "0 0 0 0", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0.5 0.5", AnchorMax = "0.5 0.5", OffsetMin = $"206 -{height}", OffsetMax = $"410 {height}" } } });
             
             builder.Add(new CuiElement { Name = $"SelectKitHeaderPanel", Parent = "SELECT_KIT_BACKDROP", Components = { new CuiRawImageComponent { Color = "0.969 0.922 0.882 0.11", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0.5 0.5", AnchorMax = "0.5 0.5", OffsetMin = $"-100 {height-22}", OffsetMax = $"100 {height-2}" } } });
             builder.Add(new CuiLabel { Text = { Text = lang.GetMessage("UI_KITSELECTION", this, player.UserIDString), Font = "robotocondensed-bold.ttf", FontSize = 14, Align = TextAnchor.MiddleLeft, Color = "1 1 1 1" }, RectTransform = { AnchorMin = $"0 0", AnchorMax = $"1 1", OffsetMin = $"6 0", OffsetMax = $"-6 0" } }, $"SelectKitHeaderPanel", "SelectKitHeaderPanel_Text" );
@@ -2007,6 +2007,15 @@ namespace Oxide.Plugins
             ExtendedCuiElementContainer innerContainer = new ExtendedCuiElementContainer();
             
             var offset = 0;
+
+            if (availableKits.Count == 0)
+            {
+                innerContainer.Add(new CuiElement { Name = $"SelectKitNone", Parent = "SELECT_KIT_SB", Components = { new CuiRawImageComponent { Color = "0.969 0.922 0.882 0.055", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0 1", AnchorMax = "1 1", OffsetMin = $"10 -{33 + offset}", OffsetMax = $"0 -{offset}" } } });
+                innerContainer.Add(new CuiLabel { Text = { Text = lang.GetMessage("UI_KITSELECTION_NONE", this, player.UserIDString), Font = "robotocondensed-bold.ttf", FontSize = 12, Align = TextAnchor.MiddleCenter, Color = "1 1 1 0.3" }, RectTransform = { AnchorMin = $"0 0", AnchorMax = $"1 1", OffsetMin = $"3 0", OffsetMax = $"-3 0" } }, $"SelectKitNone", $"SelectKitNone_Text" );
+
+                offset += 34;
+            }
+
             // foreach(var kit in Enum.GetValues(typeof(Perk)).Cast<Perk>())
             foreach(var kit in availableKits.Keys)
             {
@@ -2799,6 +2808,7 @@ namespace Oxide.Plugins
 
                 ["UI_ADDITIONAL_COST"] = "Additional Cost",
                 ["UI_KITSELECTION"] = "Available Kits",
+                ["UI_KITSELECTION_NONE"] = "No Kits found"
             };
 
             lang.RegisterMessages(langDict, this);
