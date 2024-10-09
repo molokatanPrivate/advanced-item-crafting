@@ -55,9 +55,12 @@ Weighted Crafting will pick a random mod.
 Players can add Kits to that process to increase the chances of picking the desired mod.
 
 chance without kits: 3.3%
-Recommended Multiplier with 1 kit: 15 = 35%
-Recommended Multiplier with 2 kits: 20 = 58%
-Recommended Multiplier with 3 kits: 40 = 80%
+
+| number of Kits	| Recommended Multiplier	| chance	|
+|-------------------|---------------------------|-----------|
+| 1 Kit				| 15						| 35%		|
+| 2 Kits			| 20						| 58%		|
+| 3 Kits			| 40						| 80%		|
 
 Depending on the configuration, you can enable perk crafting for epic items and "white" items.
 Crafting of perks respects your defined white- and blacklist from Item Perks.
@@ -69,9 +72,12 @@ Weighted Crafting will pick a random mod.
 Players can add Kits to that process to increase the chances of picking the desired mod.
 
 chance without kits: 33.3%
-Recommended Multiplier with 1 kit: 1 = 50%
-Recommended Multiplier with 2 kits: 1 = 60%
-Recommended Multiplier with 3 kits: 2 = 77%
+
+| number of Kits	| Recommended Multiplier	| chance	|
+|-------------------|---------------------------|-----------|
+| 1 Kit				| 1							| 50%		|
+| 2 Kits			| 1							| 60%		|
+| 3 Kits			| 2							| 77%		|
 
 You can define additional costs for this process in the configuration.
 

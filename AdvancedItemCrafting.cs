@@ -29,10 +29,12 @@ using System.Text;
  * - most translations are used from Epic Items and Item Perks to make transformation easier
  * 
  * TODOs by priority:
+ * - additional costs null = none required
  * - stacked items?
  * - check permission based buffs
  * - add permission checks for epic item tiers?
  * - remove inconsitencies when using CuiPanel etc
+ * - unweighted actions require their own text
  * - clean up imports
  * - revise UI component names and coords
  * - someone should explain when using Pool stuff and when not. Thought there is a GC (Gen0...)?
@@ -2153,7 +2155,7 @@ namespace Oxide.Plugins
                 if (Item.hasCondition)
                 {
                     Add(new CuiPanel {
-                        Image = { Color = "0.55 0.78 0.24 0.25", Sprite = "assets/content/ui/ui.background.tiletext.psd" },
+                        Image = { Color = "0.55 0.78 0.24 0.25", Sprite = "assets/content/ui/ui.background.tiletex.psd" },
                         RectTransform = { AnchorMin = "0 0", AnchorMax = "0 1", OffsetMax = $"{imageOffset} 0" }
                     }, Name, $"{Name}_ConditionBG");
 
