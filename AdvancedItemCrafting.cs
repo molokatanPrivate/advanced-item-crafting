@@ -1442,7 +1442,7 @@ namespace Oxide.Plugins
 
             // add set buffs to epic buff values
             var epicBuffs = playerState.activeEpicBuffs;
-            var permissions = new List<string>();
+            var permissions = "";
             foreach(var setBonus in playerState.setBonus)
             {
                 var set = epicConfig.enhancements[setBonus.Key];
@@ -1461,8 +1461,9 @@ namespace Oxide.Plugins
 
                 foreach(var pieceBonus in pieceBonuses.setBonus)
                 {
-                    /**if (pieceBonus.Value.perms != null)
-                        permissions.Add(pieceBonus.Value.perms);**/
+                    if (pieceBonus.Value.perms != null)
+                        foreach (var perm in pieceBonus.Value.perms)
+                            permissions += permissions == "" ? perm.Value : $", {perm.Value}";
 
                     if (pieceBonus.Key.Equals(Buff.BonusMultiplier))
                     {
@@ -1485,7 +1486,7 @@ namespace Oxide.Plugins
             
             offset += 23;
 
-            if (epicBuffs.Count == 0)
+            if (epicBuffs.Count == 0 && permissions.Length == 0)
             {
                 innerContainer.Add(new CuiElement { Name = $"BonusDescriptionEpicNone", Parent = "AI_PLAYER_BUFFS_DETAILS", Components = { new CuiRawImageComponent { Color = "0.969 0.922 0.882 0.055", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0 1", AnchorMax = "1 1", OffsetMin = $"10 -{33 + offset}", OffsetMax = $"0 -{offset}" } } });
                 innerContainer.Add(new CuiLabel { Text = { Text = lang.GetMessage("UI_PLAYERBUFFS_NO_EPIC", this, player.UserIDString), Font = "robotocondensed-bold.ttf", FontSize = 12, Align = TextAnchor.MiddleCenter, Color = "1 1 1 0.3" }, RectTransform = { AnchorMin = $"0 0", AnchorMax = $"1 1", OffsetMin = $"3 0", OffsetMax = $"-3 0" } }, $"BonusDescriptionEpicNone", $"BonusDescriptionEpicNone_Text" );
@@ -1502,6 +1503,17 @@ namespace Oxide.Plugins
 
                 innerContainer.Add(new CuiElement { Name = $"BonusDescription{epic.Key.ToString()}", Parent = "AI_PLAYER_BUFFS_DETAILS", Components = { new CuiRawImageComponent { Color = "0.969 0.922 0.882 0.055", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0.3 1", AnchorMax = "1 1", OffsetMin = $"0 -{33 + offset}", OffsetMax = $"-10 -{offset}" } } });
                 innerContainer.Add(new CuiLabel { Text = { Text = string.Format(GetSetBonusDescription(player, epic.Key), epic.Value * 100), Font = "robotocondensed-bold.ttf", FontSize = 12, Align = TextAnchor.MiddleLeft, Color = "1 1 1 1" }, RectTransform = { AnchorMin = $"0 0", AnchorMax = $"1 1", OffsetMin = $"3 0", OffsetMax = $"-3 0" } }, $"BonusDescription{epic.Key.ToString()}", $"BonusDescription_Text{epic.Key.ToString()}" );
+            
+                offset += 34;
+            }
+
+            if (permissions != "")
+            {                
+                innerContainer.Add(new CuiElement { Name = $"BonusDescriptionPermissions", Parent = "AI_PLAYER_BUFFS_DETAILS", Components = { new CuiRawImageComponent { Color = "0.969 0.922 0.882 0.055", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0 1", AnchorMax = "0.3 1", OffsetMin = $"10 -{33 + offset}", OffsetMax = $"0 -{offset}" } } });
+                innerContainer.Add(new CuiLabel { Text = { Text = lang.GetMessage("UI_EPICBUFFDESCRIPTION_SET_BONU_PERMISSION", this, player.UserIDString), Font = "robotocondensed-bold.ttf", FontSize = 12, Align = TextAnchor.MiddleLeft, Color = $"1 1 1 1" }, RectTransform = { AnchorMin = $"0 0", AnchorMax = $"1 1", OffsetMin = $"3 0", OffsetMax = $"-3 0" } }, $"BonusDescriptionPermissions", $"BonusDescriptionPermissions_Text" );
+                
+                innerContainer.Add(new CuiElement { Name = $"BonusDescriptionPermissionsText", Parent = "AI_PLAYER_BUFFS_DETAILS", Components = { new CuiRawImageComponent { Color = "0.969 0.922 0.882 0.055", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0.3 1", AnchorMax = "1 1", OffsetMin = $"0 -{33 + offset}", OffsetMax = $"-10 -{offset}" } } });
+                innerContainer.Add(new CuiLabel { Text = { Text = permissions, Font = "robotocondensed-bold.ttf", FontSize = 12, Align = TextAnchor.MiddleLeft, Color = "1 1 1 1" }, RectTransform = { AnchorMin = $"0 0", AnchorMax = $"1 1", OffsetMin = $"3 0", OffsetMax = $"-3 0" } }, $"BonusDescriptionPermissionsText", $"BonusDescriptionPermissionsText_Text" );
             
                 offset += 34;
             }
@@ -1753,19 +1765,24 @@ namespace Oxide.Plugins
                     innerContainer.Add(new CuiElement { Name = $"BonusDescription{s.Key.ToString()}", Parent = "AI_EPIC_BUFF_DESCRIPTION", Components = { new CuiRawImageComponent { Color = "0.969 0.922 0.882 0.055", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0 1", AnchorMax = "0.3 1", OffsetMin = $"10 -{33 + offset}", OffsetMax = $"0 -{offset}" } } });
                     innerContainer.Add(new CuiLabel { Text = { Text = lang.GetMessage(s.Key.ToString(), EpicLoot, player.UserIDString), Font = "robotocondensed-bold.ttf", FontSize = 12, Align = TextAnchor.MiddleLeft, Color = $"{col.r} {col.g} {col.b} {col.a}" }, RectTransform = { AnchorMin = $"0 0", AnchorMax = $"1 1", OffsetMin = $"3 0", OffsetMax = $"-3 0" } }, $"BonusDescription{s.Key.ToString()}", $"BonusDescription_Text{s.Key.ToString()}" );
 
-                    innerContainer.Add(new CuiElement { Name = $"BonusDescription{s.Key.ToString()}", Parent = "AI_EPIC_BUFF_DESCRIPTION", Components = { new CuiRawImageComponent { Color = "0.969 0.922 0.882 0.055", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0.3 1", AnchorMax = "1 1", OffsetMin = $"0 -{33 + offset}", OffsetMax = $"-10 -{offset}" } } });
-                    innerContainer.Add(new CuiLabel { Text = { Text = string.Format(GetSetBonusDescription(player, s.Key), s.Value.modifier * 100), Font = "robotocondensed-bold.ttf", FontSize = 12, Align = TextAnchor.MiddleLeft, Color = "1 1 1 1" }, RectTransform = { AnchorMin = $"0 0", AnchorMax = $"1 1", OffsetMin = $"3 0", OffsetMax = $"-3 0" } }, $"BonusDescription{s.Key.ToString()}", $"BonusDescription_Text{s.Key.ToString()}" );
+                    innerContainer.Add(new CuiElement { Name = $"BonusDescriptionText{s.Key.ToString()}", Parent = "AI_EPIC_BUFF_DESCRIPTION", Components = { new CuiRawImageComponent { Color = "0.969 0.922 0.882 0.055", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0.3 1", AnchorMax = "1 1", OffsetMin = $"0 -{33 + offset}", OffsetMax = $"-10 -{offset}" } } });
+                    innerContainer.Add(new CuiLabel { Text = { Text = string.Format(GetSetBonusDescription(player, s.Key), s.Value.modifier * 100), Font = "robotocondensed-bold.ttf", FontSize = 12, Align = TextAnchor.MiddleLeft, Color = "1 1 1 1" }, RectTransform = { AnchorMin = $"0 0", AnchorMax = $"1 1", OffsetMin = $"3 0", OffsetMax = $"-3 0" } }, $"BonusDescriptionText{s.Key.ToString()}", $"BonusDescription_Text{s.Key.ToString()}" );
 
                     offset += 34;
+
+                    // FIXME: we should move the permissions to the end of set piece bonus list and simply combine all to one string
+
                     if (s.Value.perms != null && s.Value.perms.Count > 0)
                     {
                         foreach (var perm in s.Value.perms)
                         {
-                            // FIXME: translation
-                            var PermBonusDescription = string.Format("Perm: {0}", perm.Value);
-                            innerContainer.Add(new CuiElement { Name = $"BonusDescription{s.Key.ToString()}_{perm.Value}", Parent = "AI_EPIC_BUFF_DESCRIPTION", Components = { new CuiRawImageComponent { Color = "0.969 0.922 0.882 0.025", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0 1", AnchorMax = "1 1", OffsetMin = $"10 -{18 + offset}", OffsetMax = $"-10 -{offset}" } } });
-                            innerContainer.Add(new CuiLabel { Text = { Text = $"{PermBonusDescription}", Font = "robotocondensed-bold.ttf", FontSize = 12, Align = TextAnchor.MiddleLeft, Color = "1 1 1 1" }, RectTransform = { AnchorMin = $"0 0", AnchorMax = $"1 1", OffsetMin = $"3 0", OffsetMax = $"-3 0" } }, $"BonusDescription{s.Key.ToString()}_{perm.Value}", $"BonusDescription_Text{s.Key.ToString()}_{perm.Value}" );
-                            offset += 19;
+                            innerContainer.Add(new CuiElement { Name = $"BonusDescription{s.Key.ToString()}_{perm.Value}", Parent = "AI_EPIC_BUFF_DESCRIPTION", Components = { new CuiRawImageComponent { Color = "0.969 0.922 0.882 0.055", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0 1", AnchorMax = "0.3 1", OffsetMin = $"10 -{28 + offset}", OffsetMax = $"0 -{offset}" } } });
+                            innerContainer.Add(new CuiLabel { Text = { Text = lang.GetMessage("UI_EPICBUFFDESCRIPTION_SET_BONU_PERMISSION", this, player.UserIDString), Font = "robotocondensed-bold.ttf", FontSize = 12, Align = TextAnchor.MiddleLeft, Color = $"{col.r} {col.g} {col.b} {col.a}" }, RectTransform = { AnchorMin = $"0 0", AnchorMax = $"1 1", OffsetMin = $"3 0", OffsetMax = $"-3 0" } }, $"BonusDescription{s.Key.ToString()}_{perm.Value}", $"BonusDescription_Text{s.Key.ToString()}_{perm.Value}" );
+
+                            innerContainer.Add(new CuiElement { Name = $"BonusDescriptionText{s.Key.ToString()}_{perm.Value}", Parent = "AI_EPIC_BUFF_DESCRIPTION", Components = { new CuiRawImageComponent { Color = "0.969 0.922 0.882 0.055", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0.3 1", AnchorMax = "1 1", OffsetMin = $"0 -{28 + offset}", OffsetMax = $"-10 -{offset}" } } });
+                            innerContainer.Add(new CuiLabel { Text = { Text = lang.GetMessage($"{perm.Value}", EpicLoot, player.UserIDString), Font = "robotocondensed-bold.ttf", FontSize = 12, Align = TextAnchor.MiddleLeft, Color = "1 1 1 1" }, RectTransform = { AnchorMin = $"0 0", AnchorMax = $"1 1", OffsetMin = $"3 0", OffsetMax = $"-3 0" } }, $"BonusDescriptionText{s.Key.ToString()}_{perm.Value}", $"BonusDescriptionText_Text{s.Key.ToString()}_{perm.Value}" );
+
+                            offset += 29;
                         }
                     }
                 }
@@ -2799,6 +2816,7 @@ namespace Oxide.Plugins
                 ["UI_EPICBUFFDESCRIPTION_SET_BONUS"] = "Set Bonus",
                 ["UI_EPICBUFFDESCRIPTION_SET_PIECES"] = "- {0} pieces -",
                 ["UI_EPICBUFFDESCRIPTION_SET_BONUS_DESCRIPTION"] = "<color=#077E93>{0}:</color> {1}",
+                ["UI_EPICBUFFDESCRIPTION_SET_BONU_PERMISSION"] = "<color=#ffb600>Permission</color>",
                 ["UI_EPICBUFFDESCRIPTION_TIERS"] = "Tiers",
                 ["UI_EPICBUFFDESCRIPTION_CHANCES"] = "Chances",
 
