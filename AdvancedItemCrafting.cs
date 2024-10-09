@@ -384,7 +384,7 @@ namespace Oxide.Plugins
 
             var selectedPerks = CLI.Deserialize<List<Perk>>(arg.Args[1]);
 
-            if (config.craft_settings.add_perk_settings.weight_system.enabled)
+            if (IsWeightedAction(player, "cmdaddperk"))
             {
                 if (!AddWeightedPerk(player, itemToMod, selectedPerks))
                     return;
@@ -450,7 +450,7 @@ namespace Oxide.Plugins
 
             var selectedPerks = CLI.Deserialize<List<Perk>>(arg.Args[1]);
             
-            if (config.craft_settings.remove_perk_settings.weight_system.enabled)
+            if (IsWeightedAction(player, "cmdremoveperk"))
             {
                 if (!RemoveWeightedPerk(player, itemToMod, selectedPerks)) return;
             } else if (!RemoveUnweightedPerk(player, itemToMod, selectedPerks.First()));
@@ -1916,6 +1916,7 @@ namespace Oxide.Plugins
             
             var kitItem = new BaseItem(ItemManager.CreateByName(perkConfig.enhancementSettings.enhancement_kit_settings.shortname, 1, perkConfig.enhancementSettings.enhancement_kit_settings.skin));
             var perkmulti = GetPerkMultiplier(selectedKits.Count, action);
+            var requiresKit = !IsWeightedAction(player, action);
 
             builder.Add(new CuiElement { Name = SELECT_PERK_BUFF_PANEL, Parent = BACKDROP_PANEL, Components = { new CuiRawImageComponent { Color = "0 0 0 0.95", Material = "assets/content/ui/uibackgroundblur-ingamemenu.mat", Sprite = "assets/content/ui/ui.background.gradient.psd" }, new CuiRectTransformComponent { AnchorMin = "0 0", AnchorMax = "1 1", OffsetMin = $"0 0", OffsetMax = $"0 0" } }, DestroyUi = SELECT_PERK_BUFF_PANEL });
             builder.Add(new CuiElement { Name = "SELECT_PERK_BUFFS_BACKDROP", Parent = SELECT_PERK_BUFF_PANEL, Components = { new CuiRawImageComponent { Color = "0 0 0 1", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0.5 0.5", AnchorMax = "0.5 0.5", OffsetMin = $"-202 -{height}", OffsetMax = $"202 {height}" } } });
@@ -1933,7 +1934,8 @@ namespace Oxide.Plugins
                 if (selectedKits.Count >= 1)
                 {
                     var kit1 = selectedKits.ElementAt(0);
-                    builder.Add(new CuiLabel { Text = { Text = $"{lang.GetMessage("UI" + kit1.ToString(), ItemPerks, player.UserIDString)}: +{(action == "cmdrandomizeperkvalues" ? "1" : perkConfig.enhancementSettings.perk_settings[kit1].perkWeight * perkmulti)}", Font = "robotocondensed-bold.ttf", FontSize = 12, Align = TextAnchor.MiddleCenter, Color = "1 1 1 1" }, RectTransform = { AnchorMin = $"0.5 1", AnchorMax = $"0.5 1", OffsetMin = $"-70 -70", OffsetMax = $"70 -50" } }, $"BodyPanel", $"Kit1Text" );
+                    var kitModString = requiresKit ? "" : $": +{(action == "cmdrandomizeperkvalues" ? "1" : perkConfig.enhancementSettings.perk_settings[kit1].perkWeight * perkmulti)}";
+                    builder.Add(new CuiLabel { Text = { Text = $"{lang.GetMessage("UI" + kit1.ToString(), ItemPerks, player.UserIDString)}{kitModString}", Font = "robotocondensed-bold.ttf", FontSize = 12, Align = TextAnchor.MiddleCenter, Color = "1 1 1 1" }, RectTransform = { AnchorMin = $"0.5 1", AnchorMax = $"0.5 1", OffsetMin = $"-70 -70", OffsetMax = $"70 -50" } }, $"BodyPanel", $"Kit1Text" );
                     builder.AddItemIcon(kitItem, 48f, "Kit1", "Kit1_Item");
                     builder.Add(new CuiElement { Name = $"Kit1Line", Parent = "BodyPanel", Components = { new CuiRawImageComponent { Color = "0.969 0.922 0.882 0.055", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0.5 1", AnchorMax = "0.5 1", OffsetMin = $"-2 -168", OffsetMax = $"2 -120" } } });
                 
@@ -1986,7 +1988,6 @@ namespace Oxide.Plugins
             AddPerkInfo(builder, player, itemToMod.perks, "ItemPerks", 0);
 
             // footer
-            var requiresKit = !IsWeightedAction(player, action);
             builder.Add(new CuiPanel { Image = { Color = "0.969 0.922 0.882 0.11", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, RectTransform = { AnchorMin = "0.5 0.5", AnchorMax = "0.5 0.5", OffsetMin = $"-200 -{height-2}", OffsetMax = $"200 -{height-32}" } }, "SELECT_PERK_BUFFS_BACKDROP", "ActionsPanel");
             builder.Add(new CuiButton { Button = { Color = hasPayment && (!requiresKit || selectedKits.Count == maxKits) ? "0.45098 0.55294 0.27059 1" : "0.3 0.3 0.3 1", Command = hasPayment && (!requiresKit || selectedKits.Count == maxKits) ? $"{action} {itemToMod.uid.ToString()} {CLI.Serialize(selectedKits)}" : " " }, Text = { Text = lang.GetMessage("UI_PERKBUFFSELECTION_CONFIRM", this, player.UserIDString), Font = "robotocondensed-regular.ttf", FontSize = 16, Align = TextAnchor.MiddleCenter, Color = "1 1 1 1" }, RectTransform = { AnchorMin = "0 0", AnchorMax = "0.5 1", OffsetMin = "10 5", OffsetMax = "-10 -5" } }, "ActionsPanel", "ConfirmButton", "ConfirmButton");
             builder.Add(new CuiButton { Button = { Color = "0.77255 0.23922 0.15686 1", Command = $"cmdcloseselectperkbuffs" }, Text = { Text = lang.GetMessage("UI_PERKBUFFSELECTION_CANCEL", this, player.UserIDString), Font = "robotocondensed-regular.ttf", FontSize = 16, Align = TextAnchor.MiddleCenter, Color = "1 1 1 1" }, RectTransform = { AnchorMin = "0.5 0", AnchorMax = "1 1", OffsetMin = "10 5", OffsetMax = "-10 -5" } }, "ActionsPanel", "CloseButton");
