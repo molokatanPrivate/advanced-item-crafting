@@ -530,6 +530,10 @@ namespace Oxide.Plugins
             {
                 perkString += $"[{perk.Perk} {perk.Value}]";
             }
+
+            if (baseItem.buff == null)
+                itemToMod.name = $"{perkConfig.enhancementSettings.item_name_prefix} {itemToMod.info.displayName?.english}";
+            
             itemToMod.text = perkString;
             itemToMod.MarkDirty();
 
@@ -596,6 +600,10 @@ namespace Oxide.Plugins
             {
                 perkString += $"[{perk.Perk} {perk.Value}]";
             }
+
+            if (baseItem.buff == null)
+                itemToMod.name = $"{perkConfig.enhancementSettings.item_name_prefix} {itemToMod.info.displayName?.english}";
+
             itemToMod.text = perkString;
             itemToMod.MarkDirty();
 
@@ -2314,13 +2322,13 @@ namespace Oxide.Plugins
             [JsonProperty("enabled (player can select the perk directly if disabled)")]
             public bool enabled = true;
 
-            [JsonProperty("Multiplier to use if 1 Kit is used (default = 40.0)")]
-            public float multiplier_1 = 40f;
+            [JsonProperty("Multiplier to use if 1 Kit is used")]
+            public float multiplier_1 = 15f;
 
-            [JsonProperty("Multiplier to use if 2 Kits are used (default = 40.0)")]
-            public float multiplier_2 = 40f;
+            [JsonProperty("Multiplier to use if 2 Kits are used")]
+            public float multiplier_2 = 20f;
 
-            [JsonProperty("Multiplier to use if 3 Kits are used (default = 40.0)")]
+            [JsonProperty("Multiplier to use if 3 Kits are used")]
             public float multiplier_3 = 40f;
         }
 
@@ -2622,6 +2630,10 @@ namespace Oxide.Plugins
         protected override void LoadDefaultConfig()
         {
             config = new Configuration();
+
+            config.craft_settings.remove_perk_settings.weight_system.multiplier_1 = 1;
+            config.craft_settings.remove_perk_settings.weight_system.multiplier_2 = 1;
+            config.craft_settings.remove_perk_settings.weight_system.multiplier_3 = 2;
         }
 
         private IEnumerator LoadEpicConfiguration()

@@ -117,8 +117,9 @@ The total weight of all mods is 15000.
 The chance that BradleyDamage gets picked is 12100 / 15000 = 0.806 = 80.6%
 
 ## Permissions
+
 | permission			| description										|
------------------------------------------------------------------------------
+|-----------------------|---------------------------------------------------|
 | perk_add				| the player can add perks to an item				|
 | perk_remove			| the player can remove perks from an item			|
 | perk_randomize		| the player can randomize perk values				|
