@@ -29,6 +29,7 @@ using System.Text;
  * - most translations are used from Epic Items and Item Perks to make transformation easier
  * 
  * TODOs by priority:
+ * - stacked items?
  * - check permission based buffs
  * - add permission checks for epic item tiers?
  * - remove inconsitencies when using CuiPanel etc
@@ -1433,7 +1434,8 @@ namespace Oxide.Plugins
         public void AddPlayerBuffsPanel(ExtendedCuiElementContainer builder, BasePlayer player, PlayerState playerState)
         {
             builder.Add(new CuiPanel { Image = { Color = "0 0 0 0.5" }, RectTransform = { AnchorMin = "0.5 0", AnchorMax = "0.5 0", OffsetMin = "0 0", OffsetMax = "0 0" } }, BACKDROP_PANEL, PLAYER_BUFFS_PANEL, PLAYER_BUFFS_PANEL);
-            
+            builder.Add(new CuiLabel { Text = { Text = lang.GetMessage("UI_PLAYERBUFFS_TITLE", this, player.UserIDString), Font = "robotocondensed-bold.ttf", FontSize = 18, Align = TextAnchor.MiddleLeft, Color = "1 1 1 1" }, RectTransform = { AnchorMin = "0.5 0", AnchorMax = "0.5 0", OffsetMin = $"-587 589", OffsetMax = $"-213 612" } }, PLAYER_BUFFS_PANEL, "PLAYER_BUFFS_PANEL_TITLE" );
+
             var offset = 0;
 
             // add set buffs to epic buff values
@@ -1481,6 +1483,14 @@ namespace Oxide.Plugins
             
             offset += 23;
 
+            if (epicBuffs.Count == 0)
+            {
+                innerContainer.Add(new CuiElement { Name = $"BonusDescriptionEpicNone", Parent = "AI_PLAYER_BUFFS_DETAILS", Components = { new CuiRawImageComponent { Color = "0.969 0.922 0.882 0.055", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0 1", AnchorMax = "1 1", OffsetMin = $"10 -{33 + offset}", OffsetMax = $"0 -{offset}" } } });
+                innerContainer.Add(new CuiLabel { Text = { Text = lang.GetMessage("UI_PLAYERBUFFS_NO_EPIC", this, player.UserIDString), Font = "robotocondensed-bold.ttf", FontSize = 12, Align = TextAnchor.MiddleCenter, Color = "1 1 1 0.3" }, RectTransform = { AnchorMin = $"0 0", AnchorMax = $"1 1", OffsetMin = $"3 0", OffsetMax = $"-3 0" } }, $"BonusDescriptionEpicNone", $"BonusDescriptionEpicNone_Text" );
+
+                offset += 34;
+            }
+
             foreach (var epic in epicBuffs.OrderBy(p => p.Key.ToString()))
             {
                 var col = GetColorFromHtml("#077E93");
@@ -1500,6 +1510,14 @@ namespace Oxide.Plugins
             innerContainer.Add(new CuiLabel { Text = { Text = lang.GetMessage("UI_PLAYERBUFFS_PERKS", this, player.UserIDString), Font = "robotocondensed-bold.ttf", FontSize = 14, Align = TextAnchor.MiddleLeft, Color = "1 1 1 1" }, RectTransform = { AnchorMin = $"0 0", AnchorMax = $"1 1", OffsetMin = $"6 0", OffsetMax = $"-6 0" } }, $"HeaderPerkDescription", "HeaderPerkDescription_Text" );
             
             offset += 23;
+
+            if (playerState.activePerkBuffs.Count == 0)
+            {
+                innerContainer.Add(new CuiElement { Name = $"BonusDescriptionPerkNone", Parent = "AI_PLAYER_BUFFS_DETAILS", Components = { new CuiRawImageComponent { Color = "0.969 0.922 0.882 0.055", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0 1", AnchorMax = "1 1", OffsetMin = $"10 -{33 + offset}", OffsetMax = $"0 -{offset}" } } });
+                innerContainer.Add(new CuiLabel { Text = { Text = lang.GetMessage("UI_PLAYERBUFFS_NO_PERK", this, player.UserIDString), Font = "robotocondensed-bold.ttf", FontSize = 12, Align = TextAnchor.MiddleCenter, Color = "1 1 1 0.3" }, RectTransform = { AnchorMin = $"0 0", AnchorMax = $"1 1", OffsetMin = $"3 0", OffsetMax = $"-3 0" } }, $"BonusDescriptionPerkNone", $"BonusDescriptionPerkNone_Text" );
+
+                offset += 34;
+            }
 
             foreach (var perk in playerState.activePerkBuffs.OrderBy(p => p.Key.ToString()))
             {
@@ -2141,6 +2159,7 @@ namespace Oxide.Plugins
                     }, $"{Name}_ConditionBG", $"{Name}_ConditionMax");
                 }
 
+                // FIXME: ammocount is shown behind icon
                 if (Item.ammoCount != null)
                     Add(new CuiLabel {
                         Text = { Text = $"{FormattableString.Invariant($"{Item.ammoCount:N0}")}", Font = "robotocondensed-bold.ttf", FontSize = 14, Align = TextAnchor.LowerRight, Color = "1 1 1 0.3" },
@@ -2756,8 +2775,11 @@ namespace Oxide.Plugins
                 ["UI_ITEM_DETAILS_REMOVE_PERK"] = "Remove Perk",
                 ["UI_ITEM_DETAILS_RANDOMIZE_PERKS"] = "Reroll Perk Values",
 
+                ["UI_PLAYERBUFFS_TITLE"] = "PLAYER BUFFS",
                 ["UI_PLAYERBUFFS_EPIC"] = "Epic Buffs",
+                ["UI_PLAYERBUFFS_NO_EPIC"] = "No Epic Buffs available",
                 ["UI_PLAYERBUFFS_PERKS"] = "Perk Buffs",
+                ["UI_PLAYERBUFFS_NO_PERK"] = "No Perk Buffs available",
 
                 ["UI_PERK_DETAILS_WEIGHT"] = "\nweight: <color=#ffb600>{0}</color>",
 
