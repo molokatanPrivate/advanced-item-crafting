@@ -16,6 +16,7 @@ using System.Linq;
 using UnityEngine;
 using System.ComponentModel;
 using System.Text;
+using static Oxide.Plugins.AdvancedItemCrafting.EnhancementInfo;
 
 
 /**
@@ -31,7 +32,6 @@ using System.Text;
  * TODOs by priority:
  * - stacked items?
  * - check permission based buffs
- * - add permission checks for epic item tiers?
  * - remove inconsitencies when using CuiPanel etc
  * - unweighted actions require their own text
  * - clean up imports
@@ -1882,7 +1882,9 @@ namespace Oxide.Plugins
 
             offset += 23;
 
-            foreach (var tierInfo in set.tierInfo)
+            var filteredTiers = set.tierInfo.Where(t => (t.Value.required_crafting_perm == null || permission.UserHasPermission(player.UserIDString, t.Value.required_crafting_perm)));
+
+            foreach (var tierInfo in filteredTiers)
             {
                 var col = GetColorFromHtml(epicConfig.tier_information.tier_colours[tierInfo.Key]);
                 innerContainer.Add(new CuiElement { Name = $"TierName{tierInfo.Key.ToString()}", Parent = "AI_EPIC_BUFF_DESCRIPTION", Components = { new CuiRawImageComponent { Color = "0.969 0.922 0.882 0.055", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0 1", AnchorMax = "0.3 1", OffsetMin = $"10 -{20 + offset}", OffsetMax = $"0 -{offset}" } } });
@@ -1908,10 +1910,10 @@ namespace Oxide.Plugins
             // container.Add(new CuiLabel { Text = { Text = "Chances", Font = "robotocondensed-bold.ttf", FontSize = 12, Align = TextAnchor.LowerLeft, Color = "0.8 0.8 0.8 1" }, RectTransform = { AnchorMin = $"0 0", AnchorMax = $"0.15 1", OffsetMin = $"3 3", OffsetMax = $"-3 -3" } }, "AI_EPIC_CHANCES", "AI_EPIC_ROW_CHANCE_BAR_TITLE" );
 
             innerContainer.Add(new CuiElement { Name = "AI_EPIC_CHANCE_BAR", Parent = "AI_EPIC_CHANCES_BAR_CONTAINER", Components = { new CuiRawImageComponent { Color = "0 0 0 0" }, new CuiRectTransformComponent { AnchorMin = "0 0", AnchorMax = "1 1", OffsetMin = "6 0", OffsetMax = "-6 -3" } } });
-
-            float totalWeight = set.tierInfo.Sum(s => s.Value.chance_weight);
+            
+            float totalWeight = filteredTiers.Sum(s => s.Value.chance_weight);
             float chanceOffset = 0;
-            foreach (var tierInfo in set.tierInfo)
+            foreach (var tierInfo in filteredTiers)
             {
                 var min = chanceOffset;
                 var chance = tierInfo.Value.chance_weight/totalWeight;
