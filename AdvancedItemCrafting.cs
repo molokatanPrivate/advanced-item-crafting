@@ -29,7 +29,6 @@ using System.Text;
  * - most translations are used from Epic Items and Item Perks to make transformation easier
  * 
  * TODOs by priority:
- * - additional costs null = none required
  * - stacked items?
  * - check permission based buffs
  * - add permission checks for epic item tiers?
@@ -343,7 +342,7 @@ namespace Oxide.Plugins
             BaseItem baseItem = new BaseItem(itemToMod);
 
             CraftItem craftItem = GetCraftItem(action);
-            bool hasPayment = CraftItemAmountAvailable(player, craftItem) >= craftItem.amount;
+            bool hasPayment = craftItem != null ? CraftItemAmountAvailable(player, craftItem) >= craftItem.amount : true;
             
             var maxKits = 1;
             if (IsWeightedAction(player, action))
@@ -357,7 +356,8 @@ namespace Oxide.Plugins
             ExtendedCuiElementContainer builder = new ExtendedCuiElementContainer();
             SelectPerkBuffsPanel(builder, player, headerText, infoText, baseItem, selectedPerks, maxKits, action, hasPayment);
             SelectKitPanel(builder, player, SELECT_PERK_BUFF_PANEL, 150, baseItem, selectedPerks, maxKits, action);
-            AdditionalCostPanel(builder, player, SELECT_PERK_BUFF_PANEL, craftItem, hasPayment);
+            if (craftItem != null)
+                AdditionalCostPanel(builder, player, SELECT_PERK_BUFF_PANEL, craftItem, hasPayment);
 
             CuiHelper.AddUi(player, builder);
         }
@@ -501,7 +501,7 @@ namespace Oxide.Plugins
             if (!CanReceivePerkBuff(baseItem)) return false;
 
             CraftItem craftItem = config.craft_settings.add_perk_settings.craft_item;
-            bool hasPayment = CraftItemAmountAvailable(player, craftItem) >= craftItem.amount;
+            bool hasPayment = craftItem != null ? CraftItemAmountAvailable(player, craftItem) >= craftItem.amount : true;
 
             if (!hasPayment) return false;
 
@@ -550,7 +550,7 @@ namespace Oxide.Plugins
             if (!CanReceivePerkBuff(baseItem)) return false;
 
             CraftItem craftItem = config.craft_settings.add_perk_settings.craft_item;
-            bool hasPayment = CraftItemAmountAvailable(player, craftItem) >= craftItem.amount;
+            bool hasPayment = craftItem != null ? CraftItemAmountAvailable(player, craftItem) >= craftItem.amount : true;
 
             if (!hasPayment) return false;
 
@@ -620,7 +620,7 @@ namespace Oxide.Plugins
             if (!CanRemovePerkBuff(baseItem)) return false;
 
             CraftItem craftItem = config.craft_settings.remove_perk_settings.craft_item;
-            bool hasPayment = CraftItemAmountAvailable(player, craftItem) >= craftItem.amount;
+            bool hasPayment = craftItem != null ? CraftItemAmountAvailable(player, craftItem) >= craftItem.amount : true;
 
             if (!hasPayment) return false;
 
@@ -664,7 +664,7 @@ namespace Oxide.Plugins
             if (!CanRemovePerkBuff(baseItem)) return false;
 
             CraftItem craftItem = config.craft_settings.remove_perk_settings.craft_item;
-            bool hasPayment = CraftItemAmountAvailable(player, craftItem) >= craftItem.amount;
+            bool hasPayment = craftItem != null ? CraftItemAmountAvailable(player, craftItem) >= craftItem.amount : true;
 
             if (!hasPayment) return false;
 
@@ -728,7 +728,7 @@ namespace Oxide.Plugins
             if (baseItem.perks.Count < 1) return false;
 
             CraftItem craftItem = config.craft_settings.remove_perk_settings.craft_item;
-            bool hasPayment = CraftItemAmountAvailable(player, craftItem) >= craftItem.amount;
+            bool hasPayment = craftItem != null ? CraftItemAmountAvailable(player, craftItem) >= craftItem.amount : true;
 
             if (!hasPayment) return false;
 
@@ -910,7 +910,9 @@ namespace Oxide.Plugins
 
                 amountLeft -= taken.amount;
 
-                taken.Remove();
+                taken.RemoveFromContainer();
+
+                NextTick(() => taken.Remove());
 
                 if (amountLeft <= 0) break;
             }
@@ -2682,6 +2684,8 @@ namespace Oxide.Plugins
             config.craft_settings.remove_perk_settings.weight_system.multiplier_1 = 1;
             config.craft_settings.remove_perk_settings.weight_system.multiplier_2 = 1;
             config.craft_settings.remove_perk_settings.weight_system.multiplier_3 = 2;
+
+            config.craft_settings.randomize_perk_settings.randomize_perk_item.amount = 25;
         }
 
         private IEnumerator LoadEpicConfiguration()
