@@ -49,7 +49,7 @@ namespace Oxide.Plugins
     class AdvancedItemCrafting : RustPlugin
     {
         [PluginReference]
-        private Plugin EpicLoot, ItemPerks;
+        private Plugin EpicLoot, ItemPerks, ImageLibrary;
         
         // permissions for perk crafting
         const string perm_perk_add = "advanceditemcrafting.perk_add";
@@ -72,9 +72,31 @@ namespace Oxide.Plugins
         public static AdvancedItemCrafting Instance { get; set; }
 
         #region Hooks
+        
+        string btn_icon = "assets/icons/inventory.png";
+
         void OnServerInitialized()
         {
             Instance = this;
+
+            if (config.customButton.enabled && !string.IsNullOrEmpty(config.customButton.Icon))
+            {
+                if (config.customButton.Icon.StartsWith("http"))
+                {
+                    if (ImageLibrary == null || !ImageLibrary.IsLoaded)
+                    {
+                        Puts("Image Library has to be installed to support web images");
+                        Interface.Oxide.UnloadPlugin(Name);
+                        return;
+                    }
+                    else
+                    {
+                        ImageLibrary?.Call("AddImage", config.customButton.Icon, "ai_btn_img");
+                    }
+                }
+                btn_icon = config.customButton.Icon;
+            }
+
             if (EpicLoot == null || !EpicLoot.IsLoaded)
             {
                 Puts("You must have Epic Loot installed to run this features.");
@@ -95,17 +117,43 @@ namespace Oxide.Plugins
                 ServerMgr.Instance.StartCoroutine(LoadItemPerksConfiguration());
             }
             RegisterPermissions();
+
+            if (BasePlayer.activePlayerList != null && config.customButton.enabled)
+            {
+                foreach (var player in BasePlayer.activePlayerList)
+                    CreateMainButton(player);
+            }
         }
         
         void OnPlayerDeath(BasePlayer player)
         {
+            CuiHelper.DestroyUi(player, MAIN_BUTTON);
             CuiHelper.DestroyUi(player, BACKDROP_PANEL);
+        }
+
+        void OnPlayerRespawned(BasePlayer player)
+        {
+            CreateMainButton(player);
+        }
+
+        // do we need this?
+        /**void OnPlayerConnected(BasePlayer player)
+        {
+            CreateMainButton(player);
+        }**/
+        
+        void OnPlayerSleepEnded(BasePlayer player)
+        {
+            CreateMainButton(player);
         }
 
         void Unload()
         {
             foreach (var player in BasePlayer.activePlayerList)
+            {
+                CuiHelper.DestroyUi(player, MAIN_BUTTON);
                 CuiHelper.DestroyUi(player, BACKDROP_PANEL);
+            }
         }
         #endregion Hooks
 
@@ -1408,7 +1456,27 @@ namespace Oxide.Plugins
 
         #endregion Items
 
+
         #region UIBuilder
+        public void CreateMainButton(BasePlayer player)
+        {
+            if (!config.customButton.enabled) return;
+
+            ExtendedCuiElementContainer builder = new ExtendedCuiElementContainer();
+            builder.Add(new CuiPanel { Image = { Color = config.customButton.BackgroundColor }, RectTransform = { AnchorMin = config.customButton.AnchorMin, AnchorMax = config.customButton.AnchorMax, OffsetMin = config.customButton.OffsetMin, OffsetMax = config.customButton.OffsetMax } }, config.customButton.Parent, MAIN_BUTTON);
+            
+            if (btn_icon.IsNumeric())
+                builder.Add(new CuiElement { Name = $"{MAIN_BUTTON}_Img", Parent = MAIN_BUTTON, Components = { new CuiImageComponent { Color = "1 1 1 1", ItemId = 1776460938, SkinId = Convert.ToUInt64(btn_icon) }, new CuiRectTransformComponent { AnchorMin = "0 0", AnchorMax = "1 1", OffsetMin = $"0 0", OffsetMax = $"0 0" } } });
+            else if (btn_icon.StartsWith("http"))
+                builder.Add(new CuiElement { Name = $"{MAIN_BUTTON}_Img", Parent = MAIN_BUTTON, Components = { new CuiRawImageComponent { Color = "1 1 1 1", Png = (string)ImageLibrary?.Call("GetImage", "ai_btn_img") }, new CuiRectTransformComponent { AnchorMin = "0 0", AnchorMax = "1 1", OffsetMin = $"0 0", OffsetMax = $"0 0" } } });
+            else
+                builder.Add(new CuiElement { Name = $"{MAIN_BUTTON}_Img", Parent = MAIN_BUTTON, Components = { new CuiImageComponent { Color = "1 1 1 1", Sprite = btn_icon }, new CuiRectTransformComponent { AnchorMin = "0 0", AnchorMax = "1 1", OffsetMin = "2 2", OffsetMax = "-2 -2" } } });
+
+            builder.Add(new CuiButton { Button = { Color = "0 0 0 0", Command = "cmdopeninventory" }, Text = { Text = "" }, RectTransform = { AnchorMin = "0 0", AnchorMax = "1 1", OffsetMin = "0 0", OffsetMax = "0 0" } }, MAIN_BUTTON, $"{MAIN_BUTTON}_Btn");
+            
+            CuiHelper.AddUi(player, builder);
+        }
+
         public void CreateInventoryBase(ExtendedCuiElementContainer builder, BasePlayer player)
         {
             // backdrop
@@ -2116,6 +2184,8 @@ namespace Oxide.Plugins
         static string COMMAND_SELECT_ITEM = "cmdselectitem";
         static string CLOSE_COMMAND = "cmdcloseinventory";
 
+        static string MAIN_BUTTON = "AI_MAIN_BUTTON";
+
         static string BACKDROP_PANEL = "AI_BACKDROP_PANEL";
         static string CLOSE_BUTTON = "closebutton";
 
@@ -2343,6 +2413,29 @@ namespace Oxide.Plugins
         {
             [JsonProperty("Advanced Craft Settings")]
             public AdvancedCraftSettings craft_settings = new AdvancedCraftSettings();
+            
+            [JsonProperty("UI Custom Button")]
+            public CustomButton customButton = new CustomButton();
+        }
+
+        public class CustomButton
+        {
+            [JsonProperty("Should show a custom button on the Hud? (default = false)")]
+            public bool enabled = false;
+            [JsonProperty("Icon shown on the button")]
+            public string Icon = "assets/icons/inventory.png";
+            [JsonProperty("Should we show that button on the HUD or as an Overlay?")]
+            public string Parent = "Overlay";
+            [JsonProperty("Brackground Color")]
+            public string BackgroundColor = "0.969 0.922 0.882 0.15";
+            [JsonProperty("Anchor Min")]
+            public string AnchorMin = "0.5 0";
+            [JsonProperty("Anchor Max")]
+            public string AnchorMax = "0.5 0";
+            [JsonProperty("Offset Min")]
+            public string OffsetMin = "-263 18";
+            [JsonProperty("Offset Max")]
+            public string OffsetMax = "-204 78";
         }
 
         public class AdvancedCraftSettings
