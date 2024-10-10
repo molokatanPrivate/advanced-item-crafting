@@ -777,6 +777,10 @@ namespace Oxide.Plugins
 
             itemToMod.text = perkString;
             itemToMod.MarkDirty();
+
+            if (config.craft_settings.randomize_perk_settings.success_effect != null)
+                EffectNetwork.Send(new Effect(config.craft_settings.randomize_perk_settings.success_effect, player.transform.position, player.transform.position), player.net.connection);
+
             return true;
         }
 
@@ -2423,6 +2427,9 @@ namespace Oxide.Plugins
 
             [JsonProperty("Use kits to allow lucky rolls")]
             public bool allow_lucky_rolls = true;
+
+            [JsonProperty("Effect played when rolling the item is done")]
+            public string success_effect = "assets/prefabs/deployable/research table/effects/research-success.prefab";
         }
 
         public class UpgradePerkTierConfig
