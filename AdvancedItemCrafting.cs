@@ -1756,7 +1756,7 @@ namespace Oxide.Plugins
             {
                 var innerContainer = new CuiElementContainer();
                 var offset = 3;
-                foreach (var b in GetAvailableEpicBuffsForItem(item))
+                foreach (var b in GetAvailableEpicBuffsForItem(item).OrderBy(i => i.ToString()))
                 {
                     int cost;
                     if(!epicConfig.scrapper_settings.enhancement_cost.TryGetValue(b, out cost)) continue;
