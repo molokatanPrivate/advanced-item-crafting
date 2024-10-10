@@ -610,6 +610,11 @@ namespace Oxide.Plugins
             itemToMod.text = perkString;
             itemToMod.MarkDirty();
 
+            if (config.craft_settings.add_perk_settings.weight_system.success_effect != null && (selectedPerks.Count == 0 || (selectedPerks.Count > 0 && selectedPerks.Contains(perkToAdd))))
+                EffectNetwork.Send(new Effect(config.craft_settings.add_perk_settings.weight_system.success_effect, player.transform.position, player.transform.position), player.net.connection);
+            else if (config.craft_settings.add_perk_settings.weight_system.fail_effect != null && selectedPerks.Count > 0)
+                EffectNetwork.Send(new Effect(config.craft_settings.add_perk_settings.weight_system.fail_effect, player.transform.position, player.transform.position), player.net.connection);
+
             return true;
         }
 
@@ -717,6 +722,11 @@ namespace Oxide.Plugins
             }
             itemToMod.text = perkString;
             itemToMod.MarkDirty();
+
+            if (config.craft_settings.remove_perk_settings.weight_system.success_effect != null && (selectedPerks.Count == 0 || (selectedPerks.Count > 0 && selectedPerks.Contains(perkToRemove))))
+                EffectNetwork.Send(new Effect(config.craft_settings.remove_perk_settings.weight_system.success_effect, player.transform.position, player.transform.position), player.net.connection);
+            else if (config.craft_settings.remove_perk_settings.weight_system.fail_effect != null && selectedPerks.Count > 0)
+                EffectNetwork.Send(new Effect(config.craft_settings.remove_perk_settings.weight_system.fail_effect, player.transform.position, player.transform.position), player.net.connection);
 
             return true;
         }
@@ -2380,6 +2390,12 @@ namespace Oxide.Plugins
 
             [JsonProperty("Multiplier to use if 3 Kits are used")]
             public float multiplier_3 = 40f;
+
+            [JsonProperty("Effect played when kit mod was selected")]
+            public string success_effect = "assets/prefabs/misc/halloween/lootbag/effects/gold_open.prefab";
+
+            [JsonProperty("Effect played when a random mod was selected")]
+            public string fail_effect = "assets/prefabs/deployable/bear trap/effects/bear-trap-deploy.prefab";
         }
 
         public class RemovePerkSettings
