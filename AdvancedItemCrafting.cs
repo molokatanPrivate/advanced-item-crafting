@@ -2155,7 +2155,7 @@ namespace Oxide.Plugins
                 var hasPerk = itemPerks.Contains(kit);
                 var canRandomizePerk = action == "cmdrandomizeperkvalues" && hasPerk && itemPerks.Where(i => (i == kit)).Count() > selectedKits.Where(i => (i == kit)).Count();
                 var canRemovePerk = action == "cmdremoveperk" && hasPerk;
-                var canAddPerk = action == "cmdaddperk";
+                var canAddPerk = action == "cmdaddperk" && (!itemPerks.Contains(kit) || config.craft_settings.add_perk_settings.duplicates);
                 var canAddKit = availableKits.ContainsKey(kit) && availableKits[kit] > 0 && selectedKits.Count < maxKits && (canAddPerk || canRemovePerk || canRandomizePerk);
 
                 innerContainer.Add(new CuiElement { Name = $"KitAddButton{kit.ToString()}", Parent = "SELECT_KIT_SB", Components = { new CuiRawImageComponent { Color = canAddKit ? "0.45098 0.55294 0.27059 1" : "0.3 0.3 0.3 1", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0 1", AnchorMax = "0 1", OffsetMin = $"0 -{20 + offset}", OffsetMax = $"20 -{offset}" } } });
@@ -2488,6 +2488,9 @@ namespace Oxide.Plugins
 
             [JsonProperty("Can add perks to items without perks (default = false)")]
             public bool perksForBlankItems = false;
+
+            [JsonProperty("Can add the same mod multiple times (default = false)")]
+            public bool duplicates = false;
 
             [JsonProperty("The number of perks a player can craft on items (default = 3)")]
             public int maxPossiblePerks = 3;
