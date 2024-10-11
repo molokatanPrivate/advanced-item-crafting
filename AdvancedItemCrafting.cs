@@ -123,6 +123,9 @@ namespace Oxide.Plugins
                 foreach (var player in BasePlayer.activePlayerList)
                     CreateMainButton(player);
             }
+
+            if (!string.IsNullOrEmpty(config.chatCmd))
+                cmd.AddChatCommand(config.chatCmd, this, "ChatOpenInventory");
         }
         
         void OnPlayerDeath(BasePlayer player)
@@ -154,6 +157,8 @@ namespace Oxide.Plugins
                 CuiHelper.DestroyUi(player, MAIN_BUTTON);
                 CuiHelper.DestroyUi(player, BACKDROP_PANEL);
             }
+            if (!string.IsNullOrEmpty(config.chatCmd))
+                cmd.RemoveChatCommand(config.chatCmd, this);
         }
         #endregion Hooks
 
@@ -182,6 +187,21 @@ namespace Oxide.Plugins
         #endregion Permissions
 
         #region Commands
+        void ChatOpenInventory(BasePlayer player)
+        {
+            if (player == null) return;
+
+            var playerState = new PlayerState(player);
+
+            var builder = new ExtendedCuiElementContainer();
+            CreateInventoryBase(builder, player);
+            CreateInventoryItems(builder, playerState);
+
+            AddPlayerBuffsPanel(builder, player, playerState);
+
+            CuiHelper.AddUi(player, builder);
+        }
+
         [ConsoleCommand("cmdopeninventory")]
         void CmdOpenInventory(ConsoleSystem.Arg arg)
         {
@@ -2413,6 +2433,9 @@ namespace Oxide.Plugins
 
         public class Configuration
         {
+            [JsonProperty("The chat command to open the UI (null = none)")]
+            public string chatCmd = "aicrafting";
+
             [JsonProperty("Advanced Craft Settings")]
             public AdvancedCraftSettings craft_settings = new AdvancedCraftSettings();
             

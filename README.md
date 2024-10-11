@@ -122,6 +122,13 @@ The total weight of all mods is 15000.
 
 The chance that BradleyDamage gets picked is 12100 / 15000 = 0.806 = 80.6%
 
+## Commands
+
+| command			| type		| description												|
+|-------------------|-----------|-----------------------------------------------------------|
+| aicrafting		| Chat		| Opens Inventory Panel (can be changed in configuration)	|
+| cmdopeninventory	| Console	| Opens Inventory Panel										|
+
 ## Permissions
 
 | permission			| description										|
@@ -134,7 +141,7 @@ The chance that BradleyDamage gets picked is 12100 / 15000 = 0.806 = 80.6%
 | kit3					| the player has 3 kit slots for weighted crafting	|
 | salvage				| the player can salvage epic items from menu		|
 | enhance				| the player can add epic buffs to items			|
-| enhance_free			| the player can modify items for free				|
+| enhance_free			| the player can modify all item for free			|
 
 ## Translations and Mod Configurations
 The plugin reads the Epic Loot and Item Perk configurations when starting.
