@@ -16,7 +16,6 @@ using System.Linq;
 using UnityEngine;
 using System.ComponentModel;
 using System.Text;
-using static Oxide.Plugins.AdvancedItemCrafting.EnhancementInfo;
 
 
 /**
@@ -206,17 +205,7 @@ namespace Oxide.Plugins
         void CmdOpenInventory(ConsoleSystem.Arg arg)
         {
             var player = arg.Player();
-            if (player == null) return;
-
-            var playerState = new PlayerState(player);
-
-            var builder = new ExtendedCuiElementContainer();
-            CreateInventoryBase(builder, player);
-            CreateInventoryItems(builder, playerState);
-
-            AddPlayerBuffsPanel(builder, player, playerState);
-
-            CuiHelper.AddUi(player, builder);
+            ChatOpenInventory(player);
         }
 
         [ConsoleCommand("cmdcloseinventory")]
@@ -1501,8 +1490,10 @@ namespace Oxide.Plugins
         {
             // backdrop
             builder.Add(new CuiPanel { Image = { Color = "0 0 0 0.95", Material = "assets/content/ui/uibackgroundblur-ingamemenu.mat", Sprite = "assets/content/ui/ui.background.gradient.psd" }, RectTransform = { AnchorMin = "0 0", AnchorMax = "1 1", OffsetMin = "-0.351 -0.332", OffsetMax = "0.349 0.338" }, CursorEnabled = true, KeyboardEnabled = true }, "Overlay", BACKDROP_PANEL, BACKDROP_PANEL);
+            
             // close button
-            builder.Add(new CuiButton { Button = { Color = "1 1 1 0", Command = CLOSE_COMMAND }, Text = { Text = lang.GetMessage("UICLOSE", this, player.UserIDString), Font = "robotocondensed-bold.ttf", FontSize = 20, Align = TextAnchor.MiddleCenter, Color = "1 1 1 1" }, RectTransform = { AnchorMin = "1 1", AnchorMax = "1 1", OffsetMin = "-150 -56", OffsetMax = "-50 -24" } }, BACKDROP_PANEL, CLOSE_BUTTON);
+            builder.Add(new CuiPanel { Image = { Color = "0.969 0.922 0.882 0.11", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, RectTransform = { AnchorMin = "0.5 0", AnchorMax = "0.5 0", OffsetMin = "-383 76", OffsetMax = "-213 112" } }, BACKDROP_PANEL, CLOSE_BUTTON);
+            builder.Add(new CuiButton { Button = { Color = "0.3 0.3 0.3 1", Command = CLOSE_COMMAND }, Text = { Text = lang.GetMessage("UICLOSE", this, player.UserIDString), Font = "robotocondensed-bold.ttf", FontSize = 20, Align = TextAnchor.MiddleCenter, Color = "1 1 1 1" }, RectTransform = { AnchorMin = "0 0", AnchorMax = "1 1", OffsetMin = "10 5", OffsetMax = "-10 -5" } }, CLOSE_BUTTON, $"{CLOSE_BUTTON}_Btn");
 
             // belt slots
             builder.Add(new CuiPanel { RectTransform = { AnchorMin = "0.5 0", AnchorMax = "0.5 0", OffsetMin = "-200 18", OffsetMax = "185 18" } }, BACKDROP_PANEL, BELT_PANEL);
@@ -2933,7 +2924,7 @@ namespace Oxide.Plugins
         {
             Dictionary<string, string> langDict = new Dictionary<string, string>()
             {
-                ["UICLOSE"] = "X",
+                ["UICLOSE"] = "CLOSE",
                 ["UI_OK"] = "OK",
 
                 ["CMDADDPERK_HEADER"] = "Add a random Perk",
