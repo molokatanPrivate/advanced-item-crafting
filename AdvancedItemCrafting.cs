@@ -399,7 +399,8 @@ namespace Oxide.Plugins
             BaseItem baseItem = new BaseItem(itemToMod);
 
             CraftItem craftItem = GetCraftItem(action);
-            bool hasPayment = craftItem != null ? CraftItemAmountAvailable(player, craftItem) >= craftItem.amount : true;
+            int additionalCost = GetCraftItemAmountRequired(craftItem, selectedPerks);
+            bool hasPayment = craftItem != null ? CraftItemAmountAvailable(player, craftItem) >= additionalCost : true;
             
             var maxKits = 1;
             if (IsWeightedAction(player, action))
@@ -414,7 +415,7 @@ namespace Oxide.Plugins
             SelectPerkBuffsPanel(builder, player, headerText, infoText, baseItem, selectedPerks, maxKits, action, hasPayment);
             SelectKitPanel(builder, player, SELECT_PERK_BUFF_PANEL, 150, baseItem, selectedPerks, maxKits, action);
             if (craftItem != null)
-                AdditionalCostPanel(builder, player, SELECT_PERK_BUFF_PANEL, craftItem, hasPayment);
+                AdditionalCostPanel(builder, player, SELECT_PERK_BUFF_PANEL, craftItem, additionalCost, hasPayment);
 
             CuiHelper.AddUi(player, builder);
         }
@@ -558,7 +559,8 @@ namespace Oxide.Plugins
             if (!CanReceivePerkBuff(baseItem)) return false;
 
             CraftItem craftItem = config.craft_settings.add_perk_settings.craft_item;
-            bool hasPayment = craftItem != null ? CraftItemAmountAvailable(player, craftItem) >= craftItem.amount : true;
+            int additionalCost = GetCraftItemAmountRequired(craftItem, new List<Perk> { selectedPerk });
+            bool hasPayment = craftItem != null ? CraftItemAmountAvailable(player, craftItem) >= additionalCost : true;
 
             if (!hasPayment) return false;
 
@@ -578,7 +580,7 @@ namespace Oxide.Plugins
             
             // get payment
             if (craftItem != null)
-                if (!PayItems(player, craftItem.shortname, craftItem.skin, craftItem.display_name, craftItem.amount)) return false;
+                if (!PayItems(player, craftItem.shortname, craftItem.skin, craftItem.display_name, additionalCost)) return false;
 
             if (!PayKits(player, requiredKits)) return false;
 
@@ -607,7 +609,8 @@ namespace Oxide.Plugins
             if (!CanReceivePerkBuff(baseItem)) return false;
 
             CraftItem craftItem = config.craft_settings.add_perk_settings.craft_item;
-            bool hasPayment = craftItem != null ? CraftItemAmountAvailable(player, craftItem) >= craftItem.amount : true;
+            int additionalCost = GetCraftItemAmountRequired(craftItem, selectedPerks);
+            bool hasPayment = craftItem != null ? CraftItemAmountAvailable(player, craftItem) >= additionalCost : true;
 
             if (!hasPayment) return false;
 
@@ -648,7 +651,7 @@ namespace Oxide.Plugins
             
             // get payment
             if (craftItem != null)
-                if (!PayItems(player, craftItem.shortname, craftItem.skin, craftItem.display_name, craftItem.amount)) return false;
+                if (!PayItems(player, craftItem.shortname, craftItem.skin, craftItem.display_name, additionalCost)) return false;
 
             if (!PayKits(player, requiredKits)) return false;
             
@@ -682,7 +685,8 @@ namespace Oxide.Plugins
             if (!CanRemovePerkBuff(baseItem)) return false;
 
             CraftItem craftItem = config.craft_settings.remove_perk_settings.craft_item;
-            bool hasPayment = craftItem != null ? CraftItemAmountAvailable(player, craftItem) >= craftItem.amount : true;
+            int additionalCost = GetCraftItemAmountRequired(craftItem, new List<Perk> { selectedPerk });
+            bool hasPayment = craftItem != null ? CraftItemAmountAvailable(player, craftItem) >= additionalCost : true;
 
             if (!hasPayment) return false;
 
@@ -701,7 +705,7 @@ namespace Oxide.Plugins
             
             // get payment
             if (craftItem != null)
-                if (!PayItems(player, craftItem.shortname, craftItem.skin, craftItem.display_name, craftItem.amount)) return false;
+                if (!PayItems(player, craftItem.shortname, craftItem.skin, craftItem.display_name, additionalCost)) return false;
 
             if (!PayKits(player, requiredKits)) return false;
 
@@ -726,7 +730,8 @@ namespace Oxide.Plugins
             if (!CanRemovePerkBuff(baseItem)) return false;
 
             CraftItem craftItem = config.craft_settings.remove_perk_settings.craft_item;
-            bool hasPayment = craftItem != null ? CraftItemAmountAvailable(player, craftItem) >= craftItem.amount : true;
+            int additionalCost = GetCraftItemAmountRequired(craftItem, selectedPerks);
+            bool hasPayment = craftItem != null ? CraftItemAmountAvailable(player, craftItem) >= additionalCost : true;
 
             if (!hasPayment) return false;
 
@@ -765,7 +770,7 @@ namespace Oxide.Plugins
             
             // get payment
             if (craftItem != null)
-                if (!PayItems(player, craftItem.shortname, craftItem.skin, craftItem.display_name, craftItem.amount)) return false;
+                if (!PayItems(player, craftItem.shortname, craftItem.skin, craftItem.display_name, additionalCost)) return false;
 
             if (!PayKits(player, requiredKits)) return false;
 
@@ -795,7 +800,8 @@ namespace Oxide.Plugins
             if (baseItem.perks.Count < 1) return false;
 
             CraftItem craftItem = config.craft_settings.remove_perk_settings.craft_item;
-            bool hasPayment = craftItem != null ? CraftItemAmountAvailable(player, craftItem) >= craftItem.amount : true;
+            int additionalCost = GetCraftItemAmountRequired(craftItem, selectedPerks);
+            bool hasPayment = craftItem != null ? CraftItemAmountAvailable(player, craftItem) >= additionalCost : true;
 
             if (!hasPayment) return false;
 
@@ -804,7 +810,7 @@ namespace Oxide.Plugins
             
             // get payment
             if (craftItem != null)
-                if (!PayItems(player, craftItem.shortname, craftItem.skin, craftItem.display_name, craftItem.amount)) return false;
+                if (!PayItems(player, craftItem.shortname, craftItem.skin, craftItem.display_name, additionalCost)) return false;
 
             if (!PayKits(player, requiredKits)) return false;
 
@@ -908,6 +914,20 @@ namespace Oxide.Plugins
             }
             return false;
         }
+
+        public bool RequiresKit(string action)
+        {
+            switch (action)
+            {
+                case "cmdaddperk":
+                    return config.craft_settings.add_perk_settings.weight_system.requires_kit;
+                case "cmdremoveperk":
+                    return config.craft_settings.remove_perk_settings.weight_system.requires_kit;
+                case "cmdrandomizeperkvalues":
+                    return config.craft_settings.randomize_perk_settings.requires_kit;
+            }
+            return false;
+        }
         #endregion Actions: Perks
 
         #region Actions:Payments
@@ -926,6 +946,17 @@ namespace Oxide.Plugins
                 default:
                     return null;
             }
+        }
+
+        int GetCraftItemAmountRequired(CraftItem item, List<Perk> selectedPerks)
+        {
+            if (item == null) return 0;
+
+            int amountRequired = item.amount;
+            foreach (Perk perk in selectedPerks)
+                if (item.cost_per_kit.TryGetValue(perk, out var value)) amountRequired += value;
+
+            return amountRequired;
         }
 
         int CraftItemAmountAvailable(BasePlayer player, CraftItem item)
@@ -2013,7 +2044,8 @@ namespace Oxide.Plugins
             
             var kitItem = new BaseItem(ItemManager.CreateByName(perkConfig.enhancementSettings.enhancement_kit_settings.shortname, 1, perkConfig.enhancementSettings.enhancement_kit_settings.skin));
             var perkmulti = GetPerkMultiplier(selectedKits.Count, action);
-            var requiresKit = !IsWeightedAction(player, action);
+            var isWeighted = IsWeightedAction(player, action);
+            var requiresKit = isWeighted && RequiresKit(action);
 
             builder.Add(new CuiElement { Name = SELECT_PERK_BUFF_PANEL, Parent = BACKDROP_PANEL, Components = { new CuiRawImageComponent { Color = "0 0 0 0.95", Material = "assets/content/ui/uibackgroundblur-ingamemenu.mat", Sprite = "assets/content/ui/ui.background.gradient.psd" }, new CuiRectTransformComponent { AnchorMin = "0 0", AnchorMax = "1 1", OffsetMin = $"0 0", OffsetMax = $"0 0" } }, DestroyUi = SELECT_PERK_BUFF_PANEL });
             builder.Add(new CuiElement { Name = "SELECT_PERK_BUFFS_BACKDROP", Parent = SELECT_PERK_BUFF_PANEL, Components = { new CuiRawImageComponent { Color = "0 0 0 1", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0.5 0.5", AnchorMax = "0.5 0.5", OffsetMin = $"-202 -{height}", OffsetMax = $"202 {height}" } } });
@@ -2031,7 +2063,7 @@ namespace Oxide.Plugins
                 if (selectedKits.Count >= 1)
                 {
                     var kit1 = selectedKits.ElementAt(0);
-                    var kitModString = requiresKit ? "" : $": +{(action == "cmdrandomizeperkvalues" ? "1" : perkConfig.enhancementSettings.perk_settings[kit1].perkWeight * perkmulti)}";
+                    var kitModString = !isWeighted ? "" : $": +{(action == "cmdrandomizeperkvalues" ? "1" : perkConfig.enhancementSettings.perk_settings[kit1].perkWeight * perkmulti)}";
                     builder.Add(new CuiLabel { Text = { Text = $"{lang.GetMessage("UI" + kit1.ToString(), ItemPerks, player.UserIDString)}{kitModString}", Font = "robotocondensed-bold.ttf", FontSize = 12, Align = TextAnchor.MiddleCenter, Color = "1 1 1 1" }, RectTransform = { AnchorMin = $"0.5 1", AnchorMax = $"0.5 1", OffsetMin = $"-70 -70", OffsetMax = $"70 -50" } }, $"BodyPanel", $"Kit1Text" );
                     builder.AddItemIcon(kitItem, 48f, "Kit1", "Kit1_Item");
                     builder.Add(new CuiElement { Name = $"Kit1Line", Parent = "BodyPanel", Components = { new CuiRawImageComponent { Color = "0.969 0.922 0.882 0.055", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0.5 1", AnchorMax = "0.5 1", OffsetMin = $"-2 -168", OffsetMax = $"2 -120" } } });
@@ -2086,11 +2118,11 @@ namespace Oxide.Plugins
 
             // footer
             builder.Add(new CuiPanel { Image = { Color = "0.969 0.922 0.882 0.11", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, RectTransform = { AnchorMin = "0.5 0.5", AnchorMax = "0.5 0.5", OffsetMin = $"-200 -{height-2}", OffsetMax = $"200 -{height-32}" } }, "SELECT_PERK_BUFFS_BACKDROP", "ActionsPanel");
-            builder.Add(new CuiButton { Button = { Color = hasPayment && (!requiresKit || selectedKits.Count == maxKits) ? "0.45098 0.55294 0.27059 1" : "0.3 0.3 0.3 1", Command = hasPayment && (!requiresKit || selectedKits.Count == maxKits) ? $"{action} {itemToMod.uid.ToString()} {CLI.Serialize(selectedKits)}" : " " }, Text = { Text = lang.GetMessage("UI_PERKBUFFSELECTION_CONFIRM", this, player.UserIDString), Font = "robotocondensed-regular.ttf", FontSize = 16, Align = TextAnchor.MiddleCenter, Color = "1 1 1 1" }, RectTransform = { AnchorMin = "0 0", AnchorMax = "0.5 1", OffsetMin = "10 5", OffsetMax = "-10 -5" } }, "ActionsPanel", "ConfirmButton", "ConfirmButton");
+            builder.Add(new CuiButton { Button = { Color = hasPayment && (isWeighted || selectedKits.Count == maxKits) && (!requiresKit || selectedKits.Count > 0) ? "0.45098 0.55294 0.27059 1" : "0.3 0.3 0.3 1", Command = hasPayment && (isWeighted || selectedKits.Count == maxKits) && (!requiresKit || selectedKits.Count > 0) ? $"{action} {itemToMod.uid.ToString()} {CLI.Serialize(selectedKits)}" : " " }, Text = { Text = lang.GetMessage("UI_PERKBUFFSELECTION_CONFIRM", this, player.UserIDString), Font = "robotocondensed-regular.ttf", FontSize = 16, Align = TextAnchor.MiddleCenter, Color = "1 1 1 1" }, RectTransform = { AnchorMin = "0 0", AnchorMax = "0.5 1", OffsetMin = "10 5", OffsetMax = "-10 -5" } }, "ActionsPanel", "ConfirmButton", "ConfirmButton");
             builder.Add(new CuiButton { Button = { Color = "0.77255 0.23922 0.15686 1", Command = $"cmdcloseselectperkbuffs" }, Text = { Text = lang.GetMessage("UI_PERKBUFFSELECTION_CANCEL", this, player.UserIDString), Font = "robotocondensed-regular.ttf", FontSize = 16, Align = TextAnchor.MiddleCenter, Color = "1 1 1 1" }, RectTransform = { AnchorMin = "0.5 0", AnchorMax = "1 1", OffsetMin = "10 5", OffsetMax = "-10 -5" } }, "ActionsPanel", "CloseButton");
         }
 
-        public void AdditionalCostPanel(ExtendedCuiElementContainer builder, BasePlayer player, string parent, CraftItem craftItem, bool hasPayment = true)
+        public void AdditionalCostPanel(ExtendedCuiElementContainer builder, BasePlayer player, string parent, CraftItem craftItem, int additionalCost, bool hasPayment = true)
         {
             builder.Add(new CuiElement { Name = "ADDITIONAL_COST_BACKDROP", Parent = parent, Components = { new CuiRawImageComponent { Color = "0 0 0 1", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0.5 0.5", AnchorMax = "0.5 0.5", OffsetMin = $"-410 43", OffsetMax = $"-206 150" } } });
             
@@ -2102,7 +2134,7 @@ namespace Oxide.Plugins
             builder.Add(new CuiLabel { Text = { Text = $"{craftItem.display_name.ToUpper()}", Font = "robotocondensed-bold.ttf", FontSize = 12, Align = TextAnchor.MiddleCenter, Color = "1 1 1 1" }, RectTransform = { AnchorMin = $"0.5 1", AnchorMax = $"0.5 1", OffsetMin = $"-80 -24", OffsetMax = $"80 -4" } }, $"AdditionalCostBodyPanel", $"CurrencyName" );
             builder.Add(new CuiElement { Name = $"Currency", Parent = "AdditionalCostBodyPanel", Components = { new CuiRawImageComponent { Color = hasPayment ? "0.45098 0.55294 0.27059 0.55" : "0.969 0.922 0.882 0.22", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0.5 1", AnchorMax = "0.5 1", OffsetMin = $"-24 -72", OffsetMax = $"24 -24" } } });
             
-            var currency = ItemManager.CreateByName(craftItem.shortname, craftItem.amount, craftItem.skin);
+            var currency = ItemManager.CreateByName(craftItem.shortname, additionalCost, craftItem.skin);
             builder.AddItemIconWithAmount(new BaseItem(currency), 48f, "Currency", "CurrencyIcon");
         }
         
@@ -2327,7 +2359,7 @@ namespace Oxide.Plugins
                     Add(new CuiElement
                     {
                         Components = {
-                            new CuiRawImageComponent { Color = $"{col.r} {col.g} {col.b} {col.a}" ,Sprite = "assets/content/ui/tiledpatterns/swirl_pattern.png" },
+                            new CuiRawImageComponent { Color = $"{col.r} {col.g} {col.b} {col.a}", Sprite = "assets/content/ui/tiledpatterns/swirl_pattern.png" },
                             new CuiOutlineComponent { Color = "0.2641509 0.2641509 0.2641509 1", Distance = $"{offset / 1.5f} {-offset / 1.5f}" },
                             new CuiRectTransformComponent { AnchorMin = "0 0", AnchorMax = "1 1", OffsetMin = $"{offset} {offset}", OffsetMax = $"{-offset} {-offset}" }
                         },
@@ -2507,6 +2539,9 @@ namespace Oxide.Plugins
             [JsonProperty("Multiplier to use if 3 Kits are used")]
             public float multiplier_3 = 40f;
 
+            [JsonProperty("Requires at least 1 Kit (default = true)")]
+            public bool requires_kit = true;
+
             [JsonProperty("Effect played when kit mod was selected")]
             public string success_effect = "assets/prefabs/misc/halloween/lootbag/effects/gold_open.prefab";
 
@@ -2540,6 +2575,9 @@ namespace Oxide.Plugins
             [JsonProperty("Use kits to allow lucky rolls")]
             public bool allow_lucky_rolls = true;
 
+            [JsonProperty("Requires at least 1 Kit (default = true)")]
+            public bool requires_kit = true;
+
             [JsonProperty("Effect played when rolling the item is done")]
             public string success_effect = "assets/prefabs/deployable/research table/effects/research-success.prefab";
         }
@@ -2568,6 +2606,9 @@ namespace Oxide.Plugins
             public string shortname = "blood";
             public ulong skin = 2834920066;
             public int amount = 100;
+
+            [JsonProperty("Additional cost per Kit")]
+            public Dictionary<Perk, int> cost_per_kit = new Dictionary<Perk, int>();
         }
         #endregion
 
@@ -2821,6 +2862,31 @@ namespace Oxide.Plugins
             config.craft_settings.remove_perk_settings.weight_system.multiplier_3 = 2;
 
             config.craft_settings.randomize_perk_settings.randomize_perk_item.amount = 25;
+
+            // sample values to showcase configuration
+            config.craft_settings.add_perk_settings.craft_item.cost_per_kit.Add(Perk.BradleyDamage, 50);
+            config.craft_settings.add_perk_settings.craft_item.cost_per_kit.Add(Perk.Deforest, 25);
+            config.craft_settings.add_perk_settings.craft_item.cost_per_kit.Add(Perk.Fabricate, 25);
+            config.craft_settings.add_perk_settings.craft_item.cost_per_kit.Add(Perk.HeliDamage, 50);
+            config.craft_settings.add_perk_settings.craft_item.cost_per_kit.Add(Perk.ScientistBane, 50);
+            config.craft_settings.add_perk_settings.craft_item.cost_per_kit.Add(Perk.ScientistWard, 25);
+            config.craft_settings.add_perk_settings.craft_item.cost_per_kit.Add(Perk.UncannyDodge, 25);
+
+            config.craft_settings.remove_perk_settings.craft_item.cost_per_kit.Add(Perk.BradleyDamage, 50);
+            config.craft_settings.remove_perk_settings.craft_item.cost_per_kit.Add(Perk.Deforest, 25);
+            config.craft_settings.remove_perk_settings.craft_item.cost_per_kit.Add(Perk.Fabricate, 25);
+            config.craft_settings.remove_perk_settings.craft_item.cost_per_kit.Add(Perk.HeliDamage, 50);
+            config.craft_settings.remove_perk_settings.craft_item.cost_per_kit.Add(Perk.ScientistBane, 50);
+            config.craft_settings.remove_perk_settings.craft_item.cost_per_kit.Add(Perk.ScientistWard, 25);
+            config.craft_settings.remove_perk_settings.craft_item.cost_per_kit.Add(Perk.UncannyDodge, 25);
+
+            config.craft_settings.remove_perk_settings.craft_item.cost_per_kit.Add(Perk.BradleyDamage, 10);
+            config.craft_settings.remove_perk_settings.craft_item.cost_per_kit.Add(Perk.Deforest, 5);
+            config.craft_settings.remove_perk_settings.craft_item.cost_per_kit.Add(Perk.Fabricate, 5);
+            config.craft_settings.remove_perk_settings.craft_item.cost_per_kit.Add(Perk.HeliDamage, 10);
+            config.craft_settings.remove_perk_settings.craft_item.cost_per_kit.Add(Perk.ScientistBane, 5);
+            config.craft_settings.remove_perk_settings.craft_item.cost_per_kit.Add(Perk.ScientistWard, 5);
+            config.craft_settings.remove_perk_settings.craft_item.cost_per_kit.Add(Perk.UncannyDodge, 5);
         }
 
         private IEnumerator LoadEpicConfiguration()

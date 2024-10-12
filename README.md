@@ -148,8 +148,18 @@ The plugin reads the Epic Loot and Item Perk configurations when starting.
 All weights, chances and mod ranges are used from this configs.
 
 ### Crafting Costs
-For Epic Loot, the defined upgrade costs are preserved. You dont have to change anything.
+#### Epic Loot
+For Epic Loot, the defined upgrade costs are taken from Epic Loot configuration. You dont have to change anything.
+
+#### Item Perks
 Because of the advanced crafting options for perks, this plugin will have its own cost configurations.
+
+You can add default additional costs for each craft type.
+Simply set the values for "Item to use when ... a perk".
+The default costs is set to use epic scrap.
+*If your server is not supporting epic, you should change that.*
+
+Additional costs can be increased for each kit used during crafting process depending on the perk of the kit.
 
 ### Translations
 You will find out when looking into the language file, that this plugin barely uses translations.
