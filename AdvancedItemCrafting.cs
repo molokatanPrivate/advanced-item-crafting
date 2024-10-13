@@ -1520,10 +1520,10 @@ namespace Oxide.Plugins
         public void CreateInventoryBase(ExtendedCuiElementContainer builder, BasePlayer player)
         {
             // backdrop
-            builder.Add(new CuiPanel { Image = { Color = "0 0 0 0.95", Material = "assets/content/ui/uibackgroundblur-ingamemenu.mat", Sprite = "assets/content/ui/ui.background.gradient.psd" }, RectTransform = { AnchorMin = "0 0", AnchorMax = "1 1", OffsetMin = "-0.351 -0.332", OffsetMax = "0.349 0.338" }, CursorEnabled = true, KeyboardEnabled = true }, "Overlay", BACKDROP_PANEL, BACKDROP_PANEL);
+            builder.Add(new CuiPanel { Image = { Color = "0 0 0 0.95", Material = "assets/content/ui/uibackgroundblur-ingamemenu.mat" }, RectTransform = { AnchorMin = "0 0", AnchorMax = "1 1", OffsetMin = "-0.351 -0.332", OffsetMax = "0.349 0.338" }, CursorEnabled = true, KeyboardEnabled = true }, "Overlay", BACKDROP_PANEL, BACKDROP_PANEL);
             
             // close button
-            builder.Add(new CuiPanel { Image = { Color = "0.969 0.922 0.882 0.11", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, RectTransform = { AnchorMin = "0.5 0", AnchorMax = "0.5 0", OffsetMin = "-383 76", OffsetMax = "-213 112" } }, BACKDROP_PANEL, CLOSE_BUTTON);
+            builder.Add(new CuiPanel { Image = { Color = "0.969 0.922 0.882 0.11" }, RectTransform = { AnchorMin = "0.5 0", AnchorMax = "0.5 0", OffsetMin = "-383 76", OffsetMax = "-213 112" } }, BACKDROP_PANEL, CLOSE_BUTTON);
             builder.Add(new CuiButton { Button = { Color = "0.3 0.3 0.3 1", Command = CLOSE_COMMAND }, Text = { Text = lang.GetMessage("UICLOSE", this, player.UserIDString), Font = "robotocondensed-bold.ttf", FontSize = 20, Align = TextAnchor.MiddleCenter, Color = "1 1 1 1" }, RectTransform = { AnchorMin = "0 0", AnchorMax = "1 1", OffsetMin = "10 5", OffsetMax = "-10 -5" } }, CLOSE_BUTTON, $"{CLOSE_BUTTON}_Btn");
 
             // belt slots
@@ -2001,7 +2001,7 @@ namespace Oxide.Plugins
         // contains buttons to confirm/cancel epic buff selection
         public void AddEpicBuffConfirmPanel(ExtendedCuiElementContainer builder, BasePlayer player, BaseItem item, Buff selectedBuff, bool hasPayment)
         {
-            builder.Add(new CuiPanel { Image = { Color = "0.969 0.922 0.882 0.11", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, RectTransform = { AnchorMin = "0.5 0", AnchorMax = "0.5 0", OffsetMin = "193 64", OffsetMax = "592 114" } }, EPIC_BUFF_DETAILS_PANEL, "AI_EPIC_BUFF_CONFIRM_PANEL");
+            builder.Add(new CuiPanel { Image = { Color = "0.969 0.922 0.882 0.11" }, RectTransform = { AnchorMin = "0.5 0", AnchorMax = "0.5 0", OffsetMin = "193 64", OffsetMax = "592 114" } }, EPIC_BUFF_DETAILS_PANEL, "AI_EPIC_BUFF_CONFIRM_PANEL");
             builder.Add(new CuiButton { Button = { Color = hasPayment? "0.45098 0.55294 0.27059 1" : "0.3 0.3 0.3 1", Command = hasPayment ? $"cmdconfirmepicselection {item.uid.Value} {selectedBuff.ToString()}" : null }, Text = { Text = lang.GetMessage("UI_EPICBUFFSELECTION_CONFIRM", this, player.UserIDString), Font = "robotocondensed-regular.ttf", FontSize = 16, Align = TextAnchor.MiddleCenter, Color = "1 1 1 1" }, RectTransform = { AnchorMin = "0 0", AnchorMax = "0.5 1", OffsetMin = "10 5", OffsetMax = "-10 -5" } }, "AI_EPIC_BUFF_CONFIRM_PANEL", "AI_EPIC_BUFF_CONFIRM_BUTTON", "AI_EPIC_BUFF_CONFIRM_BUTTON");
             builder.Add(new CuiButton { Button = { Color = "0.77255 0.23922 0.15686 1", Command = "cmdcancelepicselection" }, Text = { Text = lang.GetMessage("UI_EPICBUFFSELECTION_CANCEL", this, player.UserIDString), Font = "robotocondensed-regular.ttf", FontSize = 16, Align = TextAnchor.MiddleCenter, Color = "1 1 1 1" }, RectTransform = { AnchorMin = "0.5 0", AnchorMax = "1 1", OffsetMin = "10 5", OffsetMax = "-10 -5" } }, "AI_EPIC_BUFF_CONFIRM_PANEL", "AI_EPIC_BUFF_CANCEL_BUTTON");
         }
@@ -2047,7 +2047,7 @@ namespace Oxide.Plugins
             var isWeighted = IsWeightedAction(player, action);
             var requiresKit = isWeighted && RequiresKit(action);
 
-            builder.Add(new CuiElement { Name = SELECT_PERK_BUFF_PANEL, Parent = BACKDROP_PANEL, Components = { new CuiRawImageComponent { Color = "0 0 0 0.95", Material = "assets/content/ui/uibackgroundblur-ingamemenu.mat", Sprite = "assets/content/ui/ui.background.gradient.psd" }, new CuiRectTransformComponent { AnchorMin = "0 0", AnchorMax = "1 1", OffsetMin = $"0 0", OffsetMax = $"0 0" } }, DestroyUi = SELECT_PERK_BUFF_PANEL });
+            builder.Add(new CuiElement { Name = SELECT_PERK_BUFF_PANEL, Parent = BACKDROP_PANEL, Components = { new CuiRawImageComponent { Color = "0 0 0 0.95", Material = "assets/content/ui/uibackgroundblur-ingamemenu.mat" }, new CuiRectTransformComponent { AnchorMin = "0 0", AnchorMax = "1 1", OffsetMin = $"0 0", OffsetMax = $"0 0" } }, DestroyUi = SELECT_PERK_BUFF_PANEL });
             builder.Add(new CuiElement { Name = "SELECT_PERK_BUFFS_BACKDROP", Parent = SELECT_PERK_BUFF_PANEL, Components = { new CuiRawImageComponent { Color = "0 0 0 1", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0.5 0.5", AnchorMax = "0.5 0.5", OffsetMin = $"-202 -{height}", OffsetMax = $"202 {height}" } } });
             
             builder.Add(new CuiElement { Name = $"HeaderPanel", Parent = "SELECT_PERK_BUFFS_BACKDROP", Components = { new CuiRawImageComponent { Color = "0.969 0.922 0.882 0.11", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0.5 0.5", AnchorMax = "0.5 0.5", OffsetMin = $"-200 {height-22}", OffsetMax = $"200 {height-2}" } } });
@@ -2117,7 +2117,7 @@ namespace Oxide.Plugins
             AddPerkInfo(builder, player, itemToMod.perks, "ItemPerks", 0);
 
             // footer
-            builder.Add(new CuiPanel { Image = { Color = "0.969 0.922 0.882 0.11", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, RectTransform = { AnchorMin = "0.5 0.5", AnchorMax = "0.5 0.5", OffsetMin = $"-200 -{height-2}", OffsetMax = $"200 -{height-32}" } }, "SELECT_PERK_BUFFS_BACKDROP", "ActionsPanel");
+            builder.Add(new CuiPanel { Image = { Color = "0.969 0.922 0.882 0.11" }, RectTransform = { AnchorMin = "0.5 0.5", AnchorMax = "0.5 0.5", OffsetMin = $"-200 -{height-2}", OffsetMax = $"200 -{height-32}" } }, "SELECT_PERK_BUFFS_BACKDROP", "ActionsPanel");
             builder.Add(new CuiButton { Button = { Color = hasPayment && (isWeighted || selectedKits.Count == maxKits) && (!requiresKit || selectedKits.Count > 0) ? "0.45098 0.55294 0.27059 1" : "0.3 0.3 0.3 1", Command = hasPayment && (isWeighted || selectedKits.Count == maxKits) && (!requiresKit || selectedKits.Count > 0) ? $"{action} {itemToMod.uid.ToString()} {CLI.Serialize(selectedKits)}" : " " }, Text = { Text = lang.GetMessage("UI_PERKBUFFSELECTION_CONFIRM", this, player.UserIDString), Font = "robotocondensed-regular.ttf", FontSize = 16, Align = TextAnchor.MiddleCenter, Color = "1 1 1 1" }, RectTransform = { AnchorMin = "0 0", AnchorMax = "0.5 1", OffsetMin = "10 5", OffsetMax = "-10 -5" } }, "ActionsPanel", "ConfirmButton", "ConfirmButton");
             builder.Add(new CuiButton { Button = { Color = "0.77255 0.23922 0.15686 1", Command = $"cmdcloseselectperkbuffs" }, Text = { Text = lang.GetMessage("UI_PERKBUFFSELECTION_CANCEL", this, player.UserIDString), Font = "robotocondensed-regular.ttf", FontSize = 16, Align = TextAnchor.MiddleCenter, Color = "1 1 1 1" }, RectTransform = { AnchorMin = "0.5 0", AnchorMax = "1 1", OffsetMin = "10 5", OffsetMax = "-10 -5" } }, "ActionsPanel", "CloseButton");
         }
@@ -2215,7 +2215,6 @@ namespace Oxide.Plugins
                     },
                     new CuiRawImageComponent { Color = "0 0 0 0" },
                     new CuiRectTransformComponent { AnchorMin = "0.5 1", AnchorMax = "0.5 1", OffsetMin = $"-100 -{Math.Min(height*2-23, (offset-6+32))}", OffsetMax = $"100 -23" }
-                    // new CuiRectTransformComponent { AnchorMin = "0.5 0", AnchorMax = "0.5 0", OffsetMin = $"-587 {Math.Min(225, (offset-6+32))}", OffsetMax = $"-213 589" }
                 }
             });
 
@@ -2260,32 +2259,6 @@ namespace Oxide.Plugins
 
         #endregion UIBuilder:Component Names
 
-        /**
-        public static class RustColor
-        {
-            public static UiColor Blue = new UiColor(0.08627f, 0.25490f, 0.38431f, 1);
-            public static UiColor LightBlue = new UiColor(0.25490f, 0.61176f, 0.86275f, 1);
-            //public static UiColor Red = new UiColor(0.68627 0.21569 0.1f4118 1);
-            public static UiColor Red = new UiColor(0.77255f, 0.23922f, 0.15686f, 1);
-            public static UiColor Maroon = new UiColor(0.46667f, 0.22745f, 0.18431f, 1);
-            public static UiColor LightMaroon = new UiColor(1.00000f, 0.32549f, 0.21961f, 1);
-            //public static UiColor LightRed = new UiColor(0.9f, 1373f, 0.77647f, 0.75686f, 1);
-            //public static UiColor Green = new UiColor(0.25490, 0.30980, 0.1f4510, 1);
-            public static UiColor Green = new UiColor(0.35490f, 0.40980f, 0.24510f, 1);
-            public static UiColor LightGreen = new UiColor(0.76078f, 0.94510f, 0.41176f, 1);
-            public static UiColor Gray = new UiColor(0.45490f, 0.43529f, 0.40784f, 1);
-            public static UiColor LightGray = new UiColor(0.69804f, 0.66667f, 0.63529f, 1);
-            public static UiColor Orange = new UiColor(1, 0.53333f, 0.18039f, 1);
-            public static UiColor LightOrange = new UiColor(1, 0.82353f, 0.44706f, 1);
-            public static UiColor White = new UiColor(0.87451f, 0.83529f, 0.8f, 1);
-            public static UiColor LightWhite = new UiColor(0.97647f, 0.97647f, 0.97647f, 1);
-            public static UiColor Lime = new UiColor(0.64706f, 1, 0, 1);
-            public static UiColor LightLime = new UiColor(0.69804f, 0.83137f, 0.46667f, 1);
-            public static UiColor DarkGray = new UiColor(0.08627f, 0.08627f, 0.08627f, 1);
-            public static UiColor DarkBrown = new UiColor(0.15686f, 0.15686f, 0.12549f, 1);
-            public static UiColor LightBrown = new UiColor(0.54509f, 0.51372f, 0.4705f, 1);
-        }
-        **/
 
         #endregion
 
@@ -2304,22 +2277,21 @@ namespace Oxide.Plugins
                 if (Item.hasCondition)
                 {
                     Add(new CuiPanel {
-                        Image = { Color = "0.55 0.78 0.24 0.25", Sprite = "assets/content/ui/ui.background.tiletex.psd" },
+                        Image = { Color = "0.55 0.78 0.24 0.25" },
                         RectTransform = { AnchorMin = "0 0", AnchorMax = "0 1", OffsetMax = $"{imageOffset} 0" }
                     }, Name, $"{Name}_ConditionBG");
 
                     Add(new CuiPanel {
-                        Image = { Color = "0.55 0.78 0.24 0.75", Sprite = "assets/content/ui/ui.background.tiletex.psd" },
+                        Image = { Color = "0.55 0.78 0.24 0.75" },
                         RectTransform = { AnchorMin = "0 0", AnchorMax = $"0 {Item.condition}", OffsetMax = $"{imageOffset} 0" }
                     }, $"{Name}_ConditionBG", $"{Name}_Condition");
 
                     Add(new CuiPanel {
-                        Image = { Color = "1 1 1 1", Sprite = "assets/content/ui/ui.background.tiletex.psd" },
+                        Image = { Color = "1 1 1 1" },
                         RectTransform = { AnchorMin = $"0 {Item.maxCondition}", AnchorMax = $"0 1", OffsetMax = $"{imageOffset} 0" }
                     }, $"{Name}_ConditionBG", $"{Name}_ConditionMax");
                 }
 
-                // FIXME: ammocount is shown behind icon
                 if (Item.ammoCount != null)
                     Add(new CuiLabel {
                         Text = { Text = $"{FormattableString.Invariant($"{Item.ammoCount:N0}")}", Font = "robotocondensed-bold.ttf", FontSize = 14, Align = TextAnchor.LowerRight, Color = "1 1 1 0.3" },
@@ -2429,7 +2401,7 @@ namespace Oxide.Plugins
             public void AddInfoBox(string headerText, string bodyText, string buttonText, int bodyHeight = 74)
             {
                 var height = (58 + bodyHeight)/2;
-                Add(new CuiElement { Name = "AI_INFO_BOX", Parent = BACKDROP_PANEL, Components = { new CuiRawImageComponent { Color = "0 0 0 0.95", Material = "assets/content/ui/uibackgroundblur-ingamemenu.mat", Sprite = "assets/content/ui/ui.background.gradient.psd" }, new CuiRectTransformComponent { AnchorMin = "0 0", AnchorMax = "1 1", OffsetMin = $"0 0", OffsetMax = $"0 0" } } });
+                Add(new CuiElement { Name = "AI_INFO_BOX", Parent = BACKDROP_PANEL, Components = { new CuiRawImageComponent { Color = "0 0 0 0.95", Material = "assets/content/ui/uibackgroundblur-ingamemenu.mat" }, new CuiRectTransformComponent { AnchorMin = "0 0", AnchorMax = "1 1", OffsetMin = $"0 0", OffsetMax = $"0 0" } } });
                 Add(new CuiElement { Name = "AI_INFO_BOX_BACKDROP", Parent = "AI_INFO_BOX", Components = { new CuiRawImageComponent { Color = "0 0 0 1", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0.5 0.5", AnchorMax = "0.5 0.5", OffsetMin = $"-142 -{height}", OffsetMax = $"142 {height}" } } });
             
                 Add(new CuiElement { Name = $"HeaderInfoPanel", Parent = "AI_INFO_BOX_BACKDROP", Components = { new CuiRawImageComponent { Color = "0.969 0.922 0.882 0.11", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0.5 0.5", AnchorMax = "0.5 0.5", OffsetMin = $"-140 {height-22}", OffsetMax = $"140 {height-2}" } } });
@@ -2438,7 +2410,7 @@ namespace Oxide.Plugins
                 Add(new CuiElement { Name = $"BodyInfoPanel", Parent = "AI_INFO_BOX_BACKDROP", Components = { new CuiRawImageComponent { Color = "0.969 0.922 0.882 0.055", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0.5 0.5", AnchorMax = "0.5 0.5", OffsetMin = $"-140 -{height-33}", OffsetMax = $"140 {height-23}" } } });
                 Add(new CuiLabel { Text = { Text = bodyText, Font = "robotocondensed-bold.ttf", FontSize = 12, Align = TextAnchor.MiddleLeft, Color = "1 1 1 1" }, RectTransform = { AnchorMin = $"0 0", AnchorMax = $"1 1", OffsetMin = $"6 0", OffsetMax = $"-6 0" } }, $"BodyInfoPanel", $"BodyInfoPanel_Text" );
         
-                Add(new CuiPanel { Image = { Color = "0.969 0.922 0.882 0.11", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, RectTransform = { AnchorMin = "0.5 0.5", AnchorMax = "0.5 0.5", OffsetMin = $"-140 -{height-2}", OffsetMax = $"140 -{height-32}" } }, "AI_INFO_BOX_BACKDROP", "ActionsInfoPanel");
+                Add(new CuiPanel { Image = { Color = "0.969 0.922 0.882 0.11" }, RectTransform = { AnchorMin = "0.5 0.5", AnchorMax = "0.5 0.5", OffsetMin = $"-140 -{height-2}", OffsetMax = $"140 -{height-32}" } }, "AI_INFO_BOX_BACKDROP", "ActionsInfoPanel");
                 Add(new CuiButton { Button = { Color = "0.45098 0.55294 0.27059 1", Command = $"cmdcloseinfobox" }, Text = { Text = buttonText, Font = "robotocondensed-regular.ttf", FontSize = 16, Align = TextAnchor.MiddleCenter, Color = "1 1 1 1" }, RectTransform = { AnchorMin = "0.2 0", AnchorMax = "0.8 1", OffsetMin = "10 5", OffsetMax = "-10 -5" } }, "ActionsInfoPanel", "CloseInfoPanelButton");
             }
         }
