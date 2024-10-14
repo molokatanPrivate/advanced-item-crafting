@@ -5,8 +5,8 @@ User Interface and advanced crafting options for Item Perks and Epic Loot
 This plugin will not work without Epic Loot or Item Perks.
 One of these plugins has to be installed on the server.
 
-If you find issues during item generation processes and views, its most likely caused by this plugin.
-Any functionality of buff effects remains part of the desired plugin.
+If you find issues during item generation processes, payments and views, its most likely caused by this plugin.
+Any functionality of buff effects remain part of the original plugin.
 
 If there is a Buff missing, you can simply check out the code and add it to the enums.
 And then contact me? ;)
@@ -17,7 +17,7 @@ And then contact me? ;)
 3. Standard Crafting for Epic Items
 4. Reuse translations and mod configs
 
-## Combined Inventory-like View
+### Combined Inventory-like View
 When you open the view the first time, you will notice that it looks similar to the players inventory.
 One of the main reasons why i implemented that plugin was exactly this feature.
 You can inspect each item and see additional informations in one place.
@@ -28,7 +28,7 @@ Just check out the full list on the left side.
 For Perks you can check out descriptions when clicking the info icon (i).
 
 ### Selected Items
-When you select items, you get a (short) overview of its buff.
+When you select items, you get a (short) overview of its buffs.
 For Perk Items it will show a list of all perks and rolls in the description section.
 
 When selecting Epic Items, a new Panel will be shown.
@@ -48,10 +48,13 @@ Add-, remove- or randomize perks actions are shown in the Action Panel.
 For Epic Items you will find add- and recycle-action.
 Items other than Epic and Perk Items are NOT supported and most likely never will be supported.
 
-## Advanced Perk Crafting
+## Perk Crafting
 ### Add Perks
 (For the basics) players can add perks to existing items.
-Weighted Crafting will pick a random mod.
+By default the player selects a kit and adds the mod.
+
+For more advanced usage, you can enabled weighted crafting.
+This will pick a random mod.
 Players can add Kits to that process to increase the chances of picking the desired mod.
 
 chance without kits: 3.3%
@@ -62,12 +65,16 @@ chance without kits: 3.3%
 | 2 Kits			| 20						| 58%		|
 | 3 Kits			| 40						| 80%		|
 
+*chances can be different if you changed the original weighting of mods*
+
 Depending on the configuration, you can enable perk crafting for epic items and "white" items.
 Crafting of perks respects your defined white- and blacklist from Item Perks.
 You can define additional costs for this process in the configuration.
 
 ### Remove Perks
 Players can remove existing perks from an item.
+By default the player selects a kit and removed the mod.
+
 Weighted Crafting will pick a random mod.
 Players can add Kits to that process to increase the chances of picking the desired mod.
 
@@ -79,9 +86,12 @@ chance without kits: 33.3%
 | 2 Kits			| 1							| 60%		|
 | 3 Kits			| 2							| 77%		|
 
-You can define additional costs for this process in the configuration.
+*chances can be different if you changed the original weighting of mods*
 
-### Randomize Perk Values
+You can define additional costs for this process in the configuration.
+If configured, players can remove ALL mods from an item.
+
+### Randomize Perk Values (Advanced Crafting)
 Players can reroll the values of perks on an item to (maybe) get better values.
 
 You can enable lucky rolls in the configuration.
@@ -97,6 +107,10 @@ Players can select up to 3 Kits when modifying items.
 Each kit will add a defined value to the mod weight and increases the chance for the player to hit that mod.
 The additional mod weight value is based on the configuration for the desired action.
 
+You can make the selection of 1 kit mandatory for all weighted actions.
+
+Here some examples, how mod weights are working.
+
 #### example (no kit):
 There are 30 mods in the pool, each with a mod weight of 100.
 The weight for BradleyDamage when crafting without any kit is 100.
@@ -106,7 +120,7 @@ The chance that BradleyDamage gets picked is 100 / 3000 = 0.033 = 3.3%.
 
 #### example (3 kits - 20x):
 There are 30 mods in the pool, each with a mod weight of 100.
-The multiplier when using 3 kits is configured with 20%.
+The multiplier when using 3 kits is configured with 20x.
 The player uses 3 kits for BradleyDamage each increasing the mod weight by 2000.
 The weight for BradleyDamage when crafting is 4100.
 The total weight of all mods is 15000.
@@ -115,7 +129,7 @@ The chance that BradleyDamage gets picked is 4100 / 7000 = 0.586 = 58.6%
 
 #### example (3 kits - 40x):
 There are 30 mods in the pool, each with a mod weight of 100.
-The multiplier when using 3 kits is configured with 40%.
+The multiplier when using 3 kits is configured with 40x.
 The player uses 3 kits for BradleyDamage each increasing the mod weight by 4000.
 The weight for BradleyDamage when crafting is 12100.
 The total weight of all mods is 15000.
@@ -130,22 +144,28 @@ The chance that BradleyDamage gets picked is 12100 / 15000 = 0.806 = 80.6%
 | cmdopeninventory	| Console	| Opens Inventory Panel										|
 
 ## Permissions
+You have several options to customize the user experience by giving different permissions.
 
-| permission			| description										|
-|-----------------------|---------------------------------------------------|
-| perk_add				| the player can add perks to an item				|
-| perk_remove			| the player can remove perks from an item			|
-| perk_randomize		| the player can randomize perk values				|
-| perk_bypass_weighting	| the player can use direct crafting for perks		|
-| kit2					| the player has 2 kit slots for weighted crafting	|
-| kit3					| the player has 3 kit slots for weighted crafting	|
-| salvage				| the player can salvage epic items from menu		|
-| enhance				| the player can add epic buffs to items			|
-| enhance_free			| the player can modify all item for free			|
+A good example is the permissions to make kit slots available for weighted crafting.
+Without *perk.kit2* or *perk.kit3* set, the player can only use 1 kit.
+You can then give perk.kit2 permission when the player reaches level 20 with skill tree.
 
-## Translations and Mod Configurations
-The plugin reads the Epic Loot and Item Perk configurations when starting.
+| permission				| description										|
+|---------------------------|---------------------------------------------------|
+| perk.add					| the player can add perks to an item				|
+| perk.remove				| the player can remove perks from an item			|
+| perk.randomize			| the player can randomize perk values				|
+| perk.bypass_weighting		| the player can use direct crafting for perks		|
+| perk.kit2					| the player has 2 kit slots for weighted crafting	|
+| perk.kit3					| the player has 3 kit slots for weighted crafting	|
+| epic.salvage				| the player can salvage epic items from menu		|
+| epic.enhance				| the player can add epic buffs to items			|
+| free						| the player can modify all items for free			|
+
+## Configurations
+The plugin is reading configurations from Epic Loot and Item Perk when starting.
 All weights, chances and mod ranges are used from this configs.
+If you change anything on that configurations, you should restart the plugin.
 
 ### Crafting Costs
 #### Epic Loot
@@ -157,11 +177,12 @@ Because of the advanced crafting options for perks, this plugin will have its ow
 You can add default additional costs for each craft type.
 Simply set the values for "Item to use when ... a perk".
 The default costs is set to use epic scrap.
+
 *If your server is not supporting epic, you should change that.*
 
 Additional costs can be increased for each kit used during crafting process depending on the perk of the kit.
 
-### Translations
+## Translations
 You will find out when looking into the language file, that this plugin barely uses translations.
 One of the reasons is, that it reuses translations from Epic Loot and Item Perks.
 If you search for mod descriptions or mod names, please check out the language files of those plugins.

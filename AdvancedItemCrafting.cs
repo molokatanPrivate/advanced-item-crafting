@@ -51,21 +51,21 @@ namespace Oxide.Plugins
         private Plugin EpicLoot, ItemPerks, ImageLibrary;
         
         // permissions for perk crafting
-        const string perm_perk_add = "advanceditemcrafting.perk_add";
-        const string perm_perk_remove = "advanceditemcrafting.perk_remove";
-        const string perm_perk_randomize = "advanceditemcrafting.perk_randomize";
+        const string perm_perk_add = "advanceditemcrafting.perk.add";
+        const string perm_perk_remove = "advanceditemcrafting.perk.remove";
+        const string perm_perk_randomize = "advanceditemcrafting.perk.randomize";
         // permission to bypass weight system
-        const string perm_perk_bypass_weighting = "advanceditemcrafting.perk_bypass_weighting";
+        const string perm_perk_bypass_weighting = "advanceditemcrafting.perk.bypass_weighting";
 
         // amount usable kits for perk crafts if weighted
-        const string perm_kit_2 = "advanceditemcrafting.kit2";
-        const string perm_kit_3 = "advanceditemcrafting.kit3";
+        const string perm_kit_2 = "advanceditemcrafting.perk.kit2";
+        const string perm_kit_3 = "advanceditemcrafting.perk.kit3";
 
         // permissions for epic items
-        const string perm_salvage = "advanceditemcrafting.salvage";
-        const string perm_enhance = "advanceditemcrafting.enhance";
+        const string perm_salvage = "advanceditemcrafting.epic.salvage";
+        const string perm_enhance = "advanceditemcrafting.epic.enhance";
         // FIXME: need to check behavior for kits
-        const string perm_enhance_free = "advanceditemcrafting.enhance.free";
+        const string perm_enhance_free = "advanceditemcrafting.free";
 
         // FIXME: this instance should be removed if possible
         public static AdvancedItemCrafting Instance { get; set; }
@@ -799,7 +799,7 @@ namespace Oxide.Plugins
 
             if (baseItem.perks.Count < 1) return false;
 
-            CraftItem craftItem = config.craft_settings.remove_perk_settings.craft_item;
+            CraftItem craftItem = config.craft_settings.randomize_perk_settings.randomize_perk_item;
             int additionalCost = GetCraftItemAmountRequired(craftItem, selectedPerks);
             bool hasPayment = craftItem != null ? CraftItemAmountAvailable(player, craftItem) >= additionalCost : true;
 
@@ -813,7 +813,7 @@ namespace Oxide.Plugins
                 if (!PayItems(player, craftItem.shortname, craftItem.skin, craftItem.display_name, additionalCost)) return false;
 
             if (!PayKits(player, requiredKits)) return false;
-
+            
             string perkString = string.Empty;
             foreach (var entry in baseItem.perks)
             {
@@ -2442,18 +2442,25 @@ namespace Oxide.Plugins
         {
             [JsonProperty("Should show a custom button on the Hud? (default = false)")]
             public bool enabled = false;
+
             [JsonProperty("Icon shown on the button")]
             public string Icon = "assets/icons/inventory.png";
+
             [JsonProperty("Should we show that button on the HUD or as an Overlay?")]
             public string Parent = "Overlay";
+
             [JsonProperty("Brackground Color")]
             public string BackgroundColor = "0.969 0.922 0.882 0.15";
+
             [JsonProperty("Anchor Min")]
             public string AnchorMin = "0.5 0";
+
             [JsonProperty("Anchor Max")]
             public string AnchorMax = "0.5 0";
+
             [JsonProperty("Offset Min")]
             public string OffsetMin = "-263 18";
+
             [JsonProperty("Offset Max")]
             public string OffsetMax = "-204 78";
         }
@@ -2481,8 +2488,8 @@ namespace Oxide.Plugins
             [JsonProperty("Can add perks to Epic Items (default = false)")]
             public bool perksForEpic = false;
 
-            [JsonProperty("Can add perks to items without perks (default = false)")]
-            public bool perksForBlankItems = false;
+            [JsonProperty("Can add perks to items without perks (default = true)")]
+            public bool perksForBlankItems = true;
 
             [JsonProperty("Can add the same mod multiple times (default = false)")]
             public bool duplicates = false;
@@ -2490,7 +2497,7 @@ namespace Oxide.Plugins
             [JsonProperty("The number of perks a player can craft on items (default = 3)")]
             public int maxPossiblePerks = 3;
 
-            [JsonProperty("Item to use when adding a perk")]
+            [JsonProperty("Item to use when adding a perk (null = no additional costs)")]
             public CraftItem craft_item = new CraftItem();
 
             [JsonProperty("Use weighting to select a perk")]
@@ -2500,7 +2507,7 @@ namespace Oxide.Plugins
         public class WeightRolls
         {
             [JsonProperty("enabled (player can select the perk directly if disabled)")]
-            public bool enabled = true;
+            public bool enabled = false;
 
             [JsonProperty("Multiplier to use if 1 Kit is used")]
             public float multiplier_1 = 15f;
@@ -2529,7 +2536,7 @@ namespace Oxide.Plugins
             [JsonProperty("Can remove ALL perks from an item to make it normal (default = false)")]
             public bool canRemoveAllPerks = false;
 
-            [JsonProperty("Item to use when removing a perk")]
+            [JsonProperty("Item to use when removing a perk (null = no additional costs)")]
             public CraftItem craft_item = new CraftItem();
 
             [JsonProperty("Use weighting to select a perk")]
@@ -2541,14 +2548,14 @@ namespace Oxide.Plugins
             [JsonProperty("enabled")]
             public bool enabled = true;
 
-            [JsonProperty("Item to use when randomizing perk values")]
+            [JsonProperty("Item to use when randomizing perk values (null = no additional costs)")]
             public CraftItem randomize_perk_item = new CraftItem();
 
             [JsonProperty("Use kits to allow lucky rolls")]
-            public bool allow_lucky_rolls = true;
+            public bool allow_lucky_rolls = false;
 
-            [JsonProperty("Requires at least 1 Kit (default = true)")]
-            public bool requires_kit = true;
+            [JsonProperty("Requires at least 1 Kit (default = false)")]
+            public bool requires_kit = false;
 
             [JsonProperty("Effect played when rolling the item is done")]
             public string success_effect = "assets/prefabs/deployable/research table/effects/research-success.prefab";
@@ -2556,11 +2563,14 @@ namespace Oxide.Plugins
 
         public class UpgradePerkTierConfig
         {
-            [JsonProperty("Number of perk tiers. If this is 1, upgrading an item is not possible. (default = 3)")]
+            [JsonProperty("enabled")]
+            public bool enabled = false;
+
+            [JsonProperty("Number of perk tiers. Has to be higher than 1 (default = 3)")]
             public int perk_tiers = 3;
 
-            [JsonProperty("Chance that upgrading can fail (default = 30%)")]
-            public float upgrade_fail_chance = 0.3f;
+            [JsonProperty("Chance that upgrading can fail (default = 25%)")]
+            public float upgrade_fail_chance = 0.25f;
 
             [JsonProperty("Chance that perks will downgrade if upgrade attempt failed (default = 25%)")]
             public float downgrade_chance = 0.25f;
@@ -2579,7 +2589,7 @@ namespace Oxide.Plugins
             public ulong skin = 2834920066;
             public int amount = 100;
 
-            [JsonProperty("Additional cost per Kit")]
+            [JsonProperty("Additional cost per Kit consumed")]
             public Dictionary<Perk, int> cost_per_kit = new Dictionary<Perk, int>();
         }
         #endregion
@@ -2835,30 +2845,19 @@ namespace Oxide.Plugins
 
             config.craft_settings.randomize_perk_settings.randomize_perk_item.amount = 25;
 
-            // sample values to showcase configuration
-            config.craft_settings.add_perk_settings.craft_item.cost_per_kit.Add(Perk.BradleyDamage, 50);
-            config.craft_settings.add_perk_settings.craft_item.cost_per_kit.Add(Perk.Deforest, 25);
-            config.craft_settings.add_perk_settings.craft_item.cost_per_kit.Add(Perk.Fabricate, 25);
-            config.craft_settings.add_perk_settings.craft_item.cost_per_kit.Add(Perk.HeliDamage, 50);
-            config.craft_settings.add_perk_settings.craft_item.cost_per_kit.Add(Perk.ScientistBane, 50);
-            config.craft_settings.add_perk_settings.craft_item.cost_per_kit.Add(Perk.ScientistWard, 25);
-            config.craft_settings.add_perk_settings.craft_item.cost_per_kit.Add(Perk.UncannyDodge, 25);
+            config.craft_settings.upgrade_perk_settings.weight_system.multiplier_1 = 1;
+            config.craft_settings.upgrade_perk_settings.weight_system.multiplier_2 = 2;
+            config.craft_settings.upgrade_perk_settings.weight_system.multiplier_3 = 4;
 
-            config.craft_settings.remove_perk_settings.craft_item.cost_per_kit.Add(Perk.BradleyDamage, 50);
-            config.craft_settings.remove_perk_settings.craft_item.cost_per_kit.Add(Perk.Deforest, 25);
-            config.craft_settings.remove_perk_settings.craft_item.cost_per_kit.Add(Perk.Fabricate, 25);
-            config.craft_settings.remove_perk_settings.craft_item.cost_per_kit.Add(Perk.HeliDamage, 50);
-            config.craft_settings.remove_perk_settings.craft_item.cost_per_kit.Add(Perk.ScientistBane, 50);
-            config.craft_settings.remove_perk_settings.craft_item.cost_per_kit.Add(Perk.ScientistWard, 25);
-            config.craft_settings.remove_perk_settings.craft_item.cost_per_kit.Add(Perk.UncannyDodge, 25);
+            foreach (var perk in Enum.GetValues(typeof(Perk)).Cast<Perk>())
+            {
+                if (perk == Perk.None) continue;
 
-            config.craft_settings.remove_perk_settings.craft_item.cost_per_kit.Add(Perk.BradleyDamage, 10);
-            config.craft_settings.remove_perk_settings.craft_item.cost_per_kit.Add(Perk.Deforest, 5);
-            config.craft_settings.remove_perk_settings.craft_item.cost_per_kit.Add(Perk.Fabricate, 5);
-            config.craft_settings.remove_perk_settings.craft_item.cost_per_kit.Add(Perk.HeliDamage, 10);
-            config.craft_settings.remove_perk_settings.craft_item.cost_per_kit.Add(Perk.ScientistBane, 5);
-            config.craft_settings.remove_perk_settings.craft_item.cost_per_kit.Add(Perk.ScientistWard, 5);
-            config.craft_settings.remove_perk_settings.craft_item.cost_per_kit.Add(Perk.UncannyDodge, 5);
+                config.craft_settings.add_perk_settings.craft_item.cost_per_kit.Add(perk, 0);
+                config.craft_settings.remove_perk_settings.craft_item.cost_per_kit.Add(perk, 0);
+                config.craft_settings.randomize_perk_settings.randomize_perk_item.cost_per_kit.Add(perk, 0);
+                config.craft_settings.upgrade_perk_settings.craft_item.cost_per_kit.Add(perk, 0);
+            }
         }
 
         private IEnumerator LoadEpicConfiguration()
