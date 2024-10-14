@@ -44,7 +44,7 @@ using System.Text;
  **/
 namespace Oxide.Plugins
 {
-    [Info("AdvancedItemCrafting", "molokatan", "0.9.0"), Description("User Interface and advanced crafting options for Item Perks and Epic Loot")]
+    [Info("AdvancedItemCrafting", "molokatan", "0.9.1"), Description("User Interface and advanced crafting options for Item Perks and Epic Loot")]
     class AdvancedItemCrafting : RustPlugin
     {
         [PluginReference]
@@ -974,9 +974,8 @@ namespace Oxide.Plugins
             {
                 if (item == null) continue;
                 if (skin != null && item.skin != skin) continue;
-                if ((string.IsNullOrEmpty(name) && item.name != null) || name != item.name) continue;
-
-                result += item.amount;
+                if (string.IsNullOrEmpty(name) ? string.IsNullOrEmpty(item.name) : name == item.name)
+                    result += item.amount;
             }
             return result;
         }
@@ -1006,7 +1005,7 @@ namespace Oxide.Plugins
             {
                 if (item == null) continue;
                 if (skin != null && item.skin != skin) continue;
-                if ((string.IsNullOrEmpty(name) && item.name != null) || name != item.name) continue;
+                if (string.IsNullOrEmpty(name) ? !string.IsNullOrEmpty(item.name) : name != item.name) continue;
 
                 var taken = item.amount > amountLeft ? item.SplitItem(amountLeft) : item;
 
@@ -2131,7 +2130,7 @@ namespace Oxide.Plugins
 
             builder.Add(new CuiElement { Name = $"AdditionalCostBodyPanel", Parent = "ADDITIONAL_COST_BACKDROP", Components = { new CuiRawImageComponent { Color = "0.969 0.922 0.882 0.055", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0.5 1", AnchorMax = "0.5 1", OffsetMin = $"-100 -105", OffsetMax = $"100 -23" } } });
             
-            builder.Add(new CuiLabel { Text = { Text = $"{craftItem.display_name.ToUpper()}", Font = "robotocondensed-bold.ttf", FontSize = 12, Align = TextAnchor.MiddleCenter, Color = "1 1 1 1" }, RectTransform = { AnchorMin = $"0.5 1", AnchorMax = $"0.5 1", OffsetMin = $"-80 -24", OffsetMax = $"80 -4" } }, $"AdditionalCostBodyPanel", $"CurrencyName" );
+            builder.Add(new CuiLabel { Text = { Text = $"{craftItem.display_name?.ToUpper()}", Font = "robotocondensed-bold.ttf", FontSize = 12, Align = TextAnchor.MiddleCenter, Color = "1 1 1 1" }, RectTransform = { AnchorMin = $"0.5 1", AnchorMax = $"0.5 1", OffsetMin = $"-80 -24", OffsetMax = $"80 -4" } }, $"AdditionalCostBodyPanel", $"CurrencyName" );
             builder.Add(new CuiElement { Name = $"Currency", Parent = "AdditionalCostBodyPanel", Components = { new CuiRawImageComponent { Color = hasPayment ? "0.45098 0.55294 0.27059 0.55" : "0.969 0.922 0.882 0.22", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0.5 1", AnchorMax = "0.5 1", OffsetMin = $"-24 -72", OffsetMax = $"24 -24" } } });
             
             var currency = ItemManager.CreateByName(craftItem.shortname, additionalCost, craftItem.skin);
@@ -2584,9 +2583,9 @@ namespace Oxide.Plugins
 
         public class CraftItem
         {
-            public string display_name = "epic scrap";
-            public string shortname = "blood";
-            public ulong skin = 2834920066;
+            public string display_name = "";
+            public string shortname = "scrap";
+            public ulong skin = 0;
             public int amount = 100;
 
             [JsonProperty("Additional cost per Kit consumed")]
