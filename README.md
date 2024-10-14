@@ -1,15 +1,27 @@
 # advanced-item-crafting
 User Interface and advanced crafting options for Item Perks and Epic Loot
 
-## Troubleshooting
-This plugin will not work without Epic Loot or Item Perks.
-One of these plugins has to be installed on the server.
+## Get Started
+You can drop the plugin onto your server, and you are almost good to go.
+There are just a few steps to get it running correct.
 
-If you find issues during item generation processes, payments and views, its most likely caused by this plugin.
-Any functionality of buff effects remain part of the original plugin.
+### Permissions
+If you want to use this mod, you should make sure that players dont have permissions listed below.
+Otherwise, they can bypass costs or functionality from that plugin.
 
-If there is a Buff missing, you can simply check out the code and add it to the enums.
-And then contact me? ;)
+| plugin     | permission |			 | why?														|
+|------------|------------|----------|----------------------------------------------------------|
+| Epic Loot  | enhance    | disabled | not needed, if you dont want to use the old screen		|
+| Epic Loot  | salvage    | disabled | not needed, if you dont want to use the old screen		|
+| Item Perks | enhance    | disabled | this is mandatory, we have our own cost configurations!	|
+
+### Configurations
+We have to make sure that players dont see old UI Buttons anymore.
+
+| plugin     | configuration                                                                                    | Value                             |
+|------------|--------------------------------------------------------------------------------------------------|-----------------------------------|
+| Epic Loot  | "Enable use of the HUD button? Players can still disable it client side via the player settings" | set to **false**, we dont need it |
+| Item Perks | "Send the icon to access the ItemPerks menu?"                                                    | set to **false**, we dont need it |
 
 ## Features
 1. Combined Inventory-like View for Epic and Perk Items
@@ -17,7 +29,7 @@ And then contact me? ;)
 3. Standard Crafting for Epic Items
 4. Reuse translations and mod configs
 
-### Combined Inventory-like View
+## Combined Inventory-like View
 When you open the view the first time, you will notice that it looks similar to the players inventory.
 One of the main reasons why i implemented that plugin was exactly this feature.
 You can inspect each item and see additional informations in one place.
@@ -142,6 +154,7 @@ The chance that BradleyDamage gets picked is 12100 / 15000 = 0.806 = 80.6%
 |-------------------|-----------|-----------------------------------------------------------|
 | aicrafting		| Chat		| Opens Inventory Panel (can be changed in configuration)	|
 | cmdopeninventory	| Console	| Opens Inventory Panel										|
+nothing else needed ;)
 
 ## Permissions
 You have several options to customize the user experience by giving different permissions.
@@ -186,3 +199,13 @@ Additional costs can be increased for each kit used during crafting process depe
 You will find out when looking into the language file, that this plugin barely uses translations.
 One of the reasons is, that it reuses translations from Epic Loot and Item Perks.
 If you search for mod descriptions or mod names, please check out the language files of those plugins.
+
+## Troubleshooting
+This plugin will not work without Epic Loot or Item Perks.
+One of these plugins has to be installed on the server.
+
+If you find issues during item generation processes, payments and views, its most likely caused by this plugin.
+Any functionality of buff effects remain part of the original plugin.
+
+If there is a Buff missing, you can simply check out the code and add it to the enums.
+And then contact me? ;)
