@@ -44,7 +44,7 @@ using System.Text;
  **/
 namespace Oxide.Plugins
 {
-    [Info("AdvancedItemCrafting", "molokatan", "0.9.1"), Description("User Interface and advanced crafting options for Item Perks and Epic Loot")]
+    [Info("AdvancedItemCrafting", "molokatan", "0.9.2"), Description("User Interface and advanced crafting options for Item Perks and Epic Loot")]
     class AdvancedItemCrafting : RustPlugin
     {
         [PluginReference]
@@ -1732,40 +1732,47 @@ namespace Oxide.Plugins
         public void CreateItemActions(ExtendedCuiElementContainer builder, BasePlayer player, BaseItem item)
         {
             int offset = 0;
-            if (item.perks.Count > 0 || ((item.buff == null ? config.craft_settings.add_perk_settings.perksForBlankItems : config.craft_settings.add_perk_settings.perksForEpic) && GetAvailablePerksForItem(item).Count > 0))
+
+            if (ItemPerks != null)
             {
-                if (config.craft_settings.randomize_perk_settings.enabled && permission.UserHasPermission(player.UserIDString, perm_perk_randomize))
+                if (item.perks.Count > 0 || ((item.buff == null ? config.craft_settings.add_perk_settings.perksForBlankItems : config.craft_settings.add_perk_settings.perksForEpic) && GetAvailablePerksForItem(item).Count > 0))
                 {
-                    if (item.perks.Count > 0)
-                        builder.AddActionButton(lang.GetMessage( "UI_ITEM_DETAILS_RANDOMIZE_PERKS", this, player.UserIDString), offset, "assets/icons/gear.png", $"cmdselectperkbuffs {item.uid.Value} cmdrandomizeperkvalues {CLI.Serialize(new List<Perk>())}", ITEM_ACTIONS_CONTAINER, "RANDOMIZE_PERK");
-                    offset += 33;
-                }
+                    if (config.craft_settings.randomize_perk_settings.enabled && permission.UserHasPermission(player.UserIDString, perm_perk_randomize))
+                    {
+                        if (item.perks.Count > 0)
+                            builder.AddActionButton(lang.GetMessage( "UI_ITEM_DETAILS_RANDOMIZE_PERKS", this, player.UserIDString), offset, "assets/icons/gear.png", $"cmdselectperkbuffs {item.uid.Value} cmdrandomizeperkvalues {CLI.Serialize(new List<Perk>())}", ITEM_ACTIONS_CONTAINER, "RANDOMIZE_PERK");
+                        offset += 33;
+                    }
 
-                if (config.craft_settings.remove_perk_settings.enabled && permission.UserHasPermission(player.UserIDString, perm_perk_remove))
-                {
-                    if (CanRemovePerkBuff(item))
-                        builder.AddActionButton(lang.GetMessage( "UI_ITEM_DETAILS_REMOVE_PERK", this, player.UserIDString), offset, "assets/icons/deauthorize.png", $"cmdselectperkbuffs {item.uid.Value} cmdremoveperk {CLI.Serialize(new List<Perk>())}", ITEM_ACTIONS_CONTAINER, "REMOVE_PERK");
-                    offset += 33;
-                }
+                    if (config.craft_settings.remove_perk_settings.enabled && permission.UserHasPermission(player.UserIDString, perm_perk_remove))
+                    {
+                        if (CanRemovePerkBuff(item))
+                            builder.AddActionButton(lang.GetMessage( "UI_ITEM_DETAILS_REMOVE_PERK", this, player.UserIDString), offset, "assets/icons/deauthorize.png", $"cmdselectperkbuffs {item.uid.Value} cmdremoveperk {CLI.Serialize(new List<Perk>())}", ITEM_ACTIONS_CONTAINER, "REMOVE_PERK");
+                        offset += 33;
+                    }
 
-                if (config.craft_settings.add_perk_settings.enabled && permission.UserHasPermission(player.UserIDString, perm_perk_add))
-                {
-                    if (CanReceivePerkBuff(item))
-                        builder.AddActionButton( lang.GetMessage( "UI_ITEM_DETAILS_ADD_PERK_BUFF", this, player.UserIDString), offset, "assets/icons/authorize.png", $"cmdselectperkbuffs {item.uid.Value} cmdaddperk {CLI.Serialize(new List<Perk>())}", ITEM_ACTIONS_CONTAINER, "ADD_PERK");
-                    offset += 33;
+                    if (config.craft_settings.add_perk_settings.enabled && permission.UserHasPermission(player.UserIDString, perm_perk_add))
+                    {
+                        if (CanReceivePerkBuff(item))
+                            builder.AddActionButton( lang.GetMessage( "UI_ITEM_DETAILS_ADD_PERK_BUFF", this, player.UserIDString), offset, "assets/icons/authorize.png", $"cmdselectperkbuffs {item.uid.Value} cmdaddperk {CLI.Serialize(new List<Perk>())}", ITEM_ACTIONS_CONTAINER, "ADD_PERK");
+                        offset += 33;
+                    }
                 }
             }
 
-            if (item.buff != null)
+            if (EpicLoot != null)
             {
-                if (permission.UserHasPermission(player.UserIDString, perm_salvage))
-                    builder.AddActionButton(lang.GetMessage( "UI_ITEM_DETAILS_RECYCLE_EPIC", this, player.UserIDString), offset, "assets/icons/gear.png", $"cmdsalvageepicitem {item.uid.Value}", ITEM_ACTIONS_CONTAINER, "RECYCLE");
+                if (item.buff != null)
+                {
+                    if (permission.UserHasPermission(player.UserIDString, perm_salvage))
+                        builder.AddActionButton(lang.GetMessage( "UI_ITEM_DETAILS_RECYCLE_EPIC", this, player.UserIDString), offset, "assets/icons/gear.png", $"cmdsalvageepicitem {item.uid.Value}", ITEM_ACTIONS_CONTAINER, "RECYCLE");
+                }
+                else
+                {
+                    if (permission.UserHasPermission(player.UserIDString, perm_enhance) && CanReceiveEpicBuff(item))
+                        builder.AddActionButton(lang.GetMessage( "UI_ITEM_DETAILS_ADD_EPIC_BUFF", this, player.UserIDString), offset, "assets/icons/authorize.png", $"cmdshowepicbuffselection {item.uid.Value} None true", ITEM_ACTIONS_CONTAINER, "ADD_EPIC_BUFF");
+                } 
             }
-            else
-            {
-                if (permission.UserHasPermission(player.UserIDString, perm_enhance) && CanReceiveEpicBuff(item))
-                    builder.AddActionButton(lang.GetMessage( "UI_ITEM_DETAILS_ADD_EPIC_BUFF", this, player.UserIDString), offset, "assets/icons/authorize.png", $"cmdshowepicbuffselection {item.uid.Value} None true", ITEM_ACTIONS_CONTAINER, "ADD_EPIC_BUFF");
-            } 
         }
 
         #endregion UIBuilder:ItemDetails
@@ -2400,7 +2407,7 @@ namespace Oxide.Plugins
             public void AddInfoBox(string headerText, string bodyText, string buttonText, int bodyHeight = 74)
             {
                 var height = (58 + bodyHeight)/2;
-                Add(new CuiElement { Name = "AI_INFO_BOX", Parent = BACKDROP_PANEL, Components = { new CuiRawImageComponent { Color = "0 0 0 0.95", Material = "assets/content/ui/uibackgroundblur-ingamemenu.mat" }, new CuiRectTransformComponent { AnchorMin = "0 0", AnchorMax = "1 1", OffsetMin = $"0 0", OffsetMax = $"0 0" } } });
+                Add(new CuiElement { Name = "AI_INFO_BOX", Parent = BACKDROP_PANEL, Components = { new CuiImageComponent { Color = "0 0 0 0.95", Material = "assets/content/ui/uibackgroundblur-ingamemenu.mat" }, new CuiRectTransformComponent { AnchorMin = "0 0", AnchorMax = "1 1", OffsetMin = $"0 0", OffsetMax = $"0 0" } }, DestroyUi = "AI_INFO_BOX" });
                 Add(new CuiElement { Name = "AI_INFO_BOX_BACKDROP", Parent = "AI_INFO_BOX", Components = { new CuiRawImageComponent { Color = "0 0 0 1", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0.5 0.5", AnchorMax = "0.5 0.5", OffsetMin = $"-142 -{height}", OffsetMax = $"142 {height}" } } });
             
                 Add(new CuiElement { Name = $"HeaderInfoPanel", Parent = "AI_INFO_BOX_BACKDROP", Components = { new CuiRawImageComponent { Color = "0.969 0.922 0.882 0.11", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0.5 0.5", AnchorMax = "0.5 0.5", OffsetMin = $"-140 {height-22}", OffsetMax = $"140 {height-2}" } } });
