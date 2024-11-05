@@ -30,12 +30,9 @@ using System.Text;
  * 
  * TODOs by priority:
  * - stacked items?
- * - check permission based buffs
  * - remove inconsitencies when using CuiPanel etc
- * - unweighted actions require their own text
  * - clean up imports
  * - revise UI component names and coords
- * - someone should explain when using Pool stuff and when not. Thought there is a GC (Gen0...)?
  * 
  * possible Features/Ideas
  * - Crafting XP -> used to unlock features?
