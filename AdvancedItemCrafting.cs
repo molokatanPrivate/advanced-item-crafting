@@ -44,7 +44,7 @@ using System.Text;
  **/
 namespace Oxide.Plugins
 {
-    [Info("AdvancedItemCrafting", "molokatan", "0.9.2"), Description("User Interface and advanced crafting options for Item Perks and Epic Loot")]
+    [Info("AdvancedItemCrafting", "molokatan", "0.9.3"), Description("User Interface and advanced crafting options for Item Perks and Epic Loot")]
     class AdvancedItemCrafting : RustPlugin
     {
         [PluginReference]
@@ -402,14 +402,16 @@ namespace Oxide.Plugins
             int additionalCost = GetCraftItemAmountRequired(craftItem, selectedPerks);
             bool hasPayment = craftItem != null ? CraftItemAmountAvailable(player, craftItem) >= additionalCost : true;
             
+            bool isWeighted = IsWeightedAction(player, action);
             var maxKits = 1;
-            if (IsWeightedAction(player, action))
+            if (isWeighted)
                 maxKits = GetMaxKits(player);
             else if (action == "cmdrandomizeperkvalues")
                 maxKits = 0;
 
             string headerText = lang.GetMessage( action.ToUpper() + "_HEADER", this, player.UserIDString);
-            string infoText = string.Format(lang.GetMessage( action.ToUpper() + "_INFO", this, player.UserIDString), maxKits);
+            string infoMessageKey = $"{action.ToUpper()}_INFO{(maxKits > 1 ? "" : $"_{maxKits}")}";
+            string infoText = string.Format(lang.GetMessage( infoMessageKey, this, player.UserIDString), maxKits) + (isWeighted ? "\n"+lang.GetMessage("CAN_FAIL", this, player.UserIDString) : "");
 
             ExtendedCuiElementContainer builder = new ExtendedCuiElementContainer();
             SelectPerkBuffsPanel(builder, player, headerText, infoText, baseItem, selectedPerks, maxKits, action, hasPayment);
@@ -897,6 +899,25 @@ namespace Oxide.Plugins
                 default:
                     return 1f;
             }
+        }
+
+        public Dictionary<Perk, int> GetPerkWeights(string action, BaseItem baseItem, List<Perk> selectedPerks)
+        {
+            var requiredKits = GetRequiredKitAmount(selectedPerks);
+
+            var perkMultiplier = GetPerkMultiplier(selectedPerks.Count, action);
+
+            var itemPerkKeys = baseItem.perks.Select(el => el.Perk);
+
+            var perkWeights = GetAvailablePerkSettingsForItem(baseItem)
+                .Where(el => action == "cmdaddperk" || itemPerkKeys.Contains(el.Key))
+                .ToDictionary(el => el.Key, el => el.Value.perkWeight);
+            
+            // modify perk weights with selected kits
+            foreach (var kit in requiredKits)
+                perkWeights[kit.Key] += (int)(perkWeights[kit.Key] * requiredKits[kit.Key] * perkMultiplier);
+
+            return perkWeights;
         }
 
         public bool IsWeightedAction(BasePlayer player, string action)
@@ -2046,21 +2067,21 @@ namespace Oxide.Plugins
 
         public void SelectPerkBuffsPanel(ExtendedCuiElementContainer builder, BasePlayer player, string headerText, string bodyText, BaseItem itemToMod, List<Perk> selectedKits, int maxKits, string action, bool hasPayment = true)
         {
-            var height = (58 + 226 + (itemToMod.perks.Count * 17) + 12)/2;
-            
             var kitItem = new BaseItem(ItemManager.CreateByName(perkConfig.enhancementSettings.enhancement_kit_settings.shortname, 1, perkConfig.enhancementSettings.enhancement_kit_settings.skin));
-            var perkmulti = GetPerkMultiplier(selectedKits.Count, action);
             var isWeighted = IsWeightedAction(player, action);
+            var showChances = isWeighted && action != "cmdrandomizeperkvalues";
             var requiresKit = isWeighted && RequiresKit(action);
 
-            builder.Add(new CuiElement { Name = SELECT_PERK_BUFF_PANEL, Parent = BACKDROP_PANEL, Components = { new CuiRawImageComponent { Color = "0 0 0 0.95", Material = "assets/content/ui/uibackgroundblur-ingamemenu.mat" }, new CuiRectTransformComponent { AnchorMin = "0 0", AnchorMax = "1 1", OffsetMin = $"0 0", OffsetMax = $"0 0" } }, DestroyUi = SELECT_PERK_BUFF_PANEL });
+            var height = (58 + 226 + (itemToMod.perks.Count * 17) + 12 + (showChances ? 55 : 0))/2;
+
+            builder.Add(new CuiElement { Name = SELECT_PERK_BUFF_PANEL, Parent = BACKDROP_PANEL, Components = { new CuiImageComponent { Color = "0 0 0 0.95", Material = "assets/content/ui/uibackgroundblur-ingamemenu.mat" }, new CuiRectTransformComponent { AnchorMin = "0 0", AnchorMax = "1 1", OffsetMin = $"0 0", OffsetMax = $"0 0" } }, DestroyUi = SELECT_PERK_BUFF_PANEL });
             builder.Add(new CuiElement { Name = "SELECT_PERK_BUFFS_BACKDROP", Parent = SELECT_PERK_BUFF_PANEL, Components = { new CuiRawImageComponent { Color = "0 0 0 1", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0.5 0.5", AnchorMax = "0.5 0.5", OffsetMin = $"-202 -{height}", OffsetMax = $"202 {height}" } } });
             
             builder.Add(new CuiElement { Name = $"HeaderPanel", Parent = "SELECT_PERK_BUFFS_BACKDROP", Components = { new CuiRawImageComponent { Color = "0.969 0.922 0.882 0.11", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0.5 0.5", AnchorMax = "0.5 0.5", OffsetMin = $"-200 {height-22}", OffsetMax = $"200 {height-2}" } } });
             builder.Add(new CuiLabel { Text = { Text = headerText, Font = "robotocondensed-bold.ttf", FontSize = 14, Align = TextAnchor.MiddleLeft, Color = "1 1 1 1" }, RectTransform = { AnchorMin = $"0 0", AnchorMax = $"1 1", OffsetMin = $"6 0", OffsetMax = $"-6 0" } }, $"HeaderPanel", "HeaderPanel_Text" );
             
             builder.Add(new CuiElement { Name = $"BodyPanel", Parent = "SELECT_PERK_BUFFS_BACKDROP", Components = { new CuiRawImageComponent { Color = "0.969 0.922 0.882 0.055", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0.5 0.5", AnchorMax = "0.5 0.5", OffsetMin = $"-200 -{height-33}", OffsetMax = $"200 {height-23}" } } });
-            builder.Add(new CuiLabel { Text = { Text = bodyText, Font = "robotocondensed-bold.ttf", FontSize = 12, Align = TextAnchor.MiddleCenter, Color = "1 1 1 1" }, RectTransform = { AnchorMin = $"0 1", AnchorMax = $"1 1", OffsetMin = $"6 -36", OffsetMax = $"-6 -6" } }, $"BodyPanel", $"BodyPanel_Text" );
+            builder.Add(new CuiLabel { Text = { Text = bodyText, Font = "robotocondensed-bold.ttf", FontSize = 12, Align = TextAnchor.MiddleCenter, Color = "1 1 1 1" }, RectTransform = { AnchorMin = $"0 1", AnchorMax = $"1 1", OffsetMin = $"6 -45", OffsetMax = $"-6 -3" } }, $"BodyPanel", $"BodyPanel_Text" );
         
             // selected kits
             if (maxKits >= 1)
@@ -2069,8 +2090,7 @@ namespace Oxide.Plugins
                 if (selectedKits.Count >= 1)
                 {
                     var kit1 = selectedKits.ElementAt(0);
-                    var kitModString = !isWeighted ? "" : $": +{(action == "cmdrandomizeperkvalues" ? "1" : perkConfig.enhancementSettings.perk_settings[kit1].perkWeight * perkmulti)}";
-                    builder.Add(new CuiLabel { Text = { Text = $"{lang.GetMessage("UI" + kit1.ToString(), ItemPerks, player.UserIDString)}{kitModString}", Font = "robotocondensed-bold.ttf", FontSize = 12, Align = TextAnchor.MiddleCenter, Color = "1 1 1 1" }, RectTransform = { AnchorMin = $"0.5 1", AnchorMax = $"0.5 1", OffsetMin = $"-70 -70", OffsetMax = $"70 -50" } }, $"BodyPanel", $"Kit1Text" );
+                    builder.Add(new CuiLabel { Text = { Text = $"{lang.GetMessage("UI" + kit1.ToString(), ItemPerks, player.UserIDString)}", Font = "robotocondensed-bold.ttf", FontSize = 12, Align = TextAnchor.MiddleCenter, Color = "1 1 1 1" }, RectTransform = { AnchorMin = $"0.5 1", AnchorMax = $"0.5 1", OffsetMin = $"-70 -70", OffsetMax = $"70 -50" } }, $"BodyPanel", $"Kit1Text" );
                     builder.AddItemIcon(kitItem, 48f, "Kit1", "Kit1_Item");
                     builder.Add(new CuiElement { Name = $"Kit1Line", Parent = "BodyPanel", Components = { new CuiRawImageComponent { Color = "0.969 0.922 0.882 0.055", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0.5 1", AnchorMax = "0.5 1", OffsetMin = $"-2 -168", OffsetMax = $"2 -120" } } });
                 
@@ -2086,7 +2106,7 @@ namespace Oxide.Plugins
                 if (selectedKits.Count >= 2)
                 {
                     var kit2 = selectedKits.ElementAt(1);
-                    builder.Add(new CuiLabel { Text = { Text = $"{lang.GetMessage("UI" + kit2.ToString(), ItemPerks, player.UserIDString)}: +{(action == "cmdrandomizeperkvalues" ? "1" : perkConfig.enhancementSettings.perk_settings[kit2].perkWeight * perkmulti)}", Font = "robotocondensed-bold.ttf", FontSize = 12, Align = TextAnchor.MiddleCenter, Color = "1 1 1 1" }, RectTransform = { AnchorMin = $"0.5 1", AnchorMax = $"0.5 1", OffsetMin = $"-194 -94", OffsetMax = $"-54 -74" } }, $"BodyPanel", $"Kit2Text" );
+                    builder.Add(new CuiLabel { Text = { Text = $"{lang.GetMessage("UI" + kit2.ToString(), ItemPerks, player.UserIDString)}", Font = "robotocondensed-bold.ttf", FontSize = 12, Align = TextAnchor.MiddleCenter, Color = "1 1 1 1" }, RectTransform = { AnchorMin = $"0.5 1", AnchorMax = $"0.5 1", OffsetMin = $"-194 -94", OffsetMax = $"-54 -74" } }, $"BodyPanel", $"Kit2Text" );
                     builder.AddItemIcon(kitItem, 48f, "Kit2", "Kit2_Item");
                     builder.Add(new CuiElement { Name = $"Kit2Line_1", Parent = "BodyPanel", Components = { new CuiRawImageComponent { Color = "0.969 0.922 0.882 0.055", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0.5 1", AnchorMax = "0.5 1", OffsetMin = $"-126 -192", OffsetMax = $"-122 -144" } } });
                     builder.Add(new CuiElement { Name = $"Kit2Line_1", Parent = "BodyPanel", Components = { new CuiRawImageComponent { Color = "0.969 0.922 0.882 0.055", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0.5 1", AnchorMax = "0.5 1", OffsetMin = $"-122 -192", OffsetMax = $"-24 -188" } } });
@@ -2103,7 +2123,7 @@ namespace Oxide.Plugins
                 if (selectedKits.Count >= 3)
                 {
                     var kit3 = selectedKits.ElementAt(2);
-                    builder.Add(new CuiLabel { Text = { Text = $"{lang.GetMessage("UI" + kit3.ToString(), ItemPerks, player.UserIDString)}: +{(action == "cmdrandomizeperkvalues" ? "1" : perkConfig.enhancementSettings.perk_settings[kit3].perkWeight * perkmulti)}", Font = "robotocondensed-bold.ttf", FontSize = 12, Align = TextAnchor.MiddleCenter, Color = "1 1 1 1" }, RectTransform = { AnchorMin = $"0.5 1", AnchorMax = $"0.5 1", OffsetMin = $"54 -94", OffsetMax = $"194 -74" } }, $"BodyPanel", $"Kit3Text" );
+                    builder.Add(new CuiLabel { Text = { Text = $"{lang.GetMessage("UI" + kit3.ToString(), ItemPerks, player.UserIDString)}", Font = "robotocondensed-bold.ttf", FontSize = 12, Align = TextAnchor.MiddleCenter, Color = "1 1 1 1" }, RectTransform = { AnchorMin = $"0.5 1", AnchorMax = $"0.5 1", OffsetMin = $"54 -94", OffsetMax = $"194 -74" } }, $"BodyPanel", $"Kit3Text" );
                     builder.AddItemIcon(kitItem, 48f, "Kit3", "Kit3_Item");
                     builder.Add(new CuiElement { Name = $"Kit3Line_1", Parent = "BodyPanel", Components = { new CuiRawImageComponent { Color = "0.969 0.922 0.882 0.055", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0.5 1", AnchorMax = "0.5 1", OffsetMin = $"122 -192", OffsetMax = $"126 -144" } } });
                     builder.Add(new CuiElement { Name = $"Kit3Line_1", Parent = "BodyPanel", Components = { new CuiRawImageComponent { Color = "0.969 0.922 0.882 0.055", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0.5 1", AnchorMax = "0.5 1", OffsetMin = $"24 -192", OffsetMax = $"122 -188" } } });
@@ -2118,14 +2138,73 @@ namespace Oxide.Plugins
             builder.Add(new CuiElement { Name = $"SelectedItem", Parent = "BodyPanel", Components = { new CuiRawImageComponent { Color = "0.969 0.922 0.882 0.22", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0.5 1", AnchorMax = "0.5 1", OffsetMin = $"-24 -216", OffsetMax = $"24 -168" } } });
             builder.AddItemIcon(itemToMod, 48f, "SelectedItem", "SelectedItemIcon");
 
+            // perk chances
+            if (showChances)
+            {
+                builder.Add(new CuiElement { Name = $"ItemPerksChances", Parent = "BodyPanel", Components = { new CuiRawImageComponent { Color = "0 0 0 0", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0.5 1", AnchorMax = "0.5 1", OffsetMin = $"-160 -276", OffsetMax = $"160 -226" } } });
+                AddPerkChances(builder, player, action, itemToMod, selectedKits);
+            }
+
             // perk info
-            builder.Add(new CuiElement { Name = $"ItemPerks", Parent = "BodyPanel", Components = { new CuiRawImageComponent { Color = "0 0 0 0", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0.5 1", AnchorMax = "0.5 1", OffsetMin = $"-110 -{226 + (itemToMod.perks.Count * 17)}", OffsetMax = $"100 -226" } } });
+            builder.Add(new CuiElement { Name = $"ItemPerks", Parent = "BodyPanel", Components = { new CuiRawImageComponent { Color = "0 0 0 0", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0.5 1", AnchorMax = "0.5 1", OffsetMin = $"-110 -{226 + (itemToMod.perks.Count * 17) + (showChances ? 55 : 0)}", OffsetMax = $"100 -{226 + (showChances ? 55 : 0)}" } } });
             AddPerkInfo(builder, player, itemToMod.perks, "ItemPerks", 0);
 
             // footer
             builder.Add(new CuiPanel { Image = { Color = "0.969 0.922 0.882 0.11" }, RectTransform = { AnchorMin = "0.5 0.5", AnchorMax = "0.5 0.5", OffsetMin = $"-200 -{height-2}", OffsetMax = $"200 -{height-32}" } }, "SELECT_PERK_BUFFS_BACKDROP", "ActionsPanel");
             builder.Add(new CuiButton { Button = { Color = hasPayment && (isWeighted || selectedKits.Count == maxKits) && (!requiresKit || selectedKits.Count > 0) ? "0.45098 0.55294 0.27059 1" : "0.3 0.3 0.3 1", Command = hasPayment && (isWeighted || selectedKits.Count == maxKits) && (!requiresKit || selectedKits.Count > 0) ? $"{action} {itemToMod.uid.ToString()} {CLI.Serialize(selectedKits)}" : " " }, Text = { Text = lang.GetMessage("UI_PERKBUFFSELECTION_CONFIRM", this, player.UserIDString), Font = "robotocondensed-regular.ttf", FontSize = 16, Align = TextAnchor.MiddleCenter, Color = "1 1 1 1" }, RectTransform = { AnchorMin = "0 0", AnchorMax = "0.5 1", OffsetMin = "10 5", OffsetMax = "-10 -5" } }, "ActionsPanel", "ConfirmButton", "ConfirmButton");
             builder.Add(new CuiButton { Button = { Color = "0.77255 0.23922 0.15686 1", Command = $"cmdcloseselectperkbuffs" }, Text = { Text = lang.GetMessage("UI_PERKBUFFSELECTION_CANCEL", this, player.UserIDString), Font = "robotocondensed-regular.ttf", FontSize = 16, Align = TextAnchor.MiddleCenter, Color = "1 1 1 1" }, RectTransform = { AnchorMin = "0.5 0", AnchorMax = "1 1", OffsetMin = "10 5", OffsetMax = "-10 -5" } }, "ActionsPanel", "CloseButton");
+        }
+
+        public void AddPerkChances(ExtendedCuiElementContainer builder, BasePlayer player, string action, BaseItem itemToMod, List<Perk> selectedKits)
+        {
+            var requiredKits = GetRequiredKitAmount(selectedKits);
+
+            var perkMultiplier = GetPerkMultiplier(selectedKits.Count, action);
+
+            var itemPerkKeys = itemToMod.perks.Select(el => el.Perk);
+
+            var perkWeights = GetAvailablePerkSettingsForItem(itemToMod)
+                .Where(el => action == "cmdaddperk" || itemPerkKeys.Contains(el.Key))
+                .ToDictionary(el => el.Key, el => el.Value.perkWeight);
+            
+            // modify perk weights with selected kits
+            foreach (var kit in requiredKits)
+                perkWeights[kit.Key] += (int)(perkWeights[kit.Key] * requiredKits[kit.Key] * perkMultiplier);
+
+            var totalWeight = perkWeights.Sum(p => p.Value);
+            var selectedWeight = requiredKits.ToDictionary(el => el.Key, el => perkWeights[el.Key]);
+
+            // perk chances
+            builder.Add(new CuiElement { Name = "AI_PERK_CHANCES_BAR_CONTAINER", Parent = "ItemPerksChances", Components = { new CuiRawImageComponent { Color = "0 0 0 0", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0 1", AnchorMax = "1 1", OffsetMin = "10 -50", OffsetMax = "-10 0" } } });
+            builder.Add(new CuiElement { Name = "AI_PERK_CHANCE_BAR", Parent = "AI_PERK_CHANCES_BAR_CONTAINER", Components = { new CuiRawImageComponent { Color = "0 0 0 0" }, new CuiRectTransformComponent { AnchorMin = "0 0", AnchorMax = "1 1", OffsetMin = "6 0", OffsetMax = "-6 -3" } } });
+            
+            float chanceOffset = 0;
+            foreach (var perkWeight in selectedWeight)
+            {
+                var min = chanceOffset;
+                var chance = (float)perkWeight.Value/(float)totalWeight;
+                var middle = chanceOffset + chance/2;
+                var col = GetColorFromHtml("#dddd00");
+
+                builder.Add(new CuiLabel { Text = { Text = $"{lang.GetMessage("UI" + perkWeight.Key.ToString(), ItemPerks, player.UserIDString)}", Font = "robotocondensed-bold.ttf", FontSize = 10, Align = TextAnchor.MiddleCenter, Color = "1 1 1 1" }, RectTransform = { AnchorMin = $"{min} 1", AnchorMax = $"{min + chance} 1", OffsetMin = $"0 -12", OffsetMax = $"0 0" } }, "AI_PERK_CHANCE_BAR", "PERK_TEXT" );
+                builder.Add(new CuiLabel { Text = { Text = $"{Math.Round(chance * 100, 1)}%", Font = "robotocondensed-bold.ttf", FontSize = 10, Align = TextAnchor.MiddleCenter, Color = "1 1 1 1" }, RectTransform = { AnchorMin = $"{middle} 1", AnchorMax = $"{middle} 1", OffsetMin = $"-30 -26", OffsetMax = $"32 -14" } }, "AI_PERK_CHANCE_BAR", "PERK_PERCENT_TEXT" );
+                builder.Add(new CuiElement { Name = "PERK_SPACER_1", Parent = "AI_PERK_CHANCE_BAR", Components = { new CuiRawImageComponent { Color = "1 1 1 1", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = $"{middle} 1", AnchorMax = $"{middle} 1", OffsetMin = $"-1 -33", OffsetMax = $"0 -28" } } });
+                builder.Add(new CuiElement { Name = "PERK_SPACER_2", Parent = "AI_PERK_CHANCE_BAR", Components = { new CuiRawImageComponent { Color = "1 1 1 1", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = $"{min} 1", AnchorMax = $"{min + chance} 1", OffsetMin = $"1 -34", OffsetMax = $"-1 -33" } } });
+                builder.Add(new CuiElement { Name = "PERK_BAR", Parent = "AI_PERK_CHANCE_BAR", Components = { new CuiRawImageComponent { Color = $"{col.r} {col.g} {col.b} {col.a}", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = $"{min} 0", AnchorMax = $"{min + chance} 1", OffsetMin = $"1 3", OffsetMax = $"-1 -35" } } });
+
+                chanceOffset += chance;
+            }
+
+            // fail chance
+            var failChance = 1f-chanceOffset;
+            var failMiddle = chanceOffset + failChance/2;
+
+            builder.Add(new CuiLabel { Text = { Text = $"Random", Font = "robotocondensed-bold.ttf", FontSize = 10, Align = TextAnchor.MiddleCenter, Color = "1 1 1 1" }, RectTransform = { AnchorMin = $"{chanceOffset} 1", AnchorMax = $"1 1", OffsetMin = $"0 -12", OffsetMax = $"0 0" } }, "AI_PERK_CHANCE_BAR", "PERK_TEXT" );
+            builder.Add(new CuiLabel { Text = { Text = $"{Math.Round(failChance * 100, 1)}%", Font = "robotocondensed-bold.ttf", FontSize = 10, Align = TextAnchor.MiddleCenter, Color = "1 1 1 1" }, RectTransform = { AnchorMin = $"{failMiddle} 1", AnchorMax = $"{failMiddle} 1", OffsetMin = $"-30 -26", OffsetMax = $"30 -14" } }, "AI_PERK_CHANCE_BAR", "PERK_PERCENT_TEXT" );
+            builder.Add(new CuiElement { Name = "PERK_SPACER_1", Parent = "AI_PERK_CHANCE_BAR", Components = { new CuiRawImageComponent { Color = "1 1 1 1", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = $"{failMiddle} 1", AnchorMax = $"{failMiddle} 1", OffsetMin = $"-1 -33", OffsetMax = $"0 -28" } } });
+            builder.Add(new CuiElement { Name = "PERK_SPACER_2", Parent = "AI_PERK_CHANCE_BAR", Components = { new CuiRawImageComponent { Color = "1 1 1 1", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = $"{chanceOffset} 1", AnchorMax = $"1 1", OffsetMin = $"1 -34", OffsetMax = $"-1 -33" } } });
+                
+            builder.Add(new CuiElement { Name = "PERK_BAR", Parent = "AI_PERK_CHANCE_BAR", Components = { new CuiRawImageComponent { Color = "0.969 0.922 0.882 0.055", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = $"{chanceOffset} 0", AnchorMax = $"1 1", OffsetMin = $"1 3", OffsetMax = $"-1 -35" } } });
         }
 
         public void AdditionalCostPanel(ExtendedCuiElementContainer builder, BasePlayer player, string parent, CraftItem craftItem, int additionalCost, bool hasPayment = true)
@@ -2171,12 +2250,15 @@ namespace Oxide.Plugins
                 offset += 34;
             }
 
-            // foreach(var kit in Enum.GetValues(typeof(Perk)).Cast<Perk>())
             foreach(var kit in availableKits.Keys)
             {
                 PerkSettings perkSettings;
-                // FIXME: we need to check whitelist/blacklist of the item we want to craft on
                 if (!perkConfig.enhancementSettings.perk_settings.TryGetValue(kit, out perkSettings) || !perkSettings.enabled) continue;
+
+                var blacklisted = perkSettings.blacklist != null && perkSettings.blacklist.Count > 0 && perkSettings.blacklist.Contains(itemToMod.shortname);
+                var whitelisted = perkSettings.whitelist == null || perkSettings.whitelist.Count == 0 || perkSettings.whitelist.Contains(itemToMod.shortname);
+
+                if (blacklisted || !whitelisted) continue;
 
                 var kitSelection = selectedKits.ToList();
                 kitSelection.Add(kit);
@@ -2185,7 +2267,7 @@ namespace Oxide.Plugins
                 var canRandomizePerk = action == "cmdrandomizeperkvalues" && hasPerk && itemPerks.Where(i => (i == kit)).Count() > selectedKits.Where(i => (i == kit)).Count();
                 var canRemovePerk = action == "cmdremoveperk" && hasPerk;
                 var canAddPerk = action == "cmdaddperk" && (!itemPerks.Contains(kit) || config.craft_settings.add_perk_settings.duplicates);
-                var canAddKit = availableKits.ContainsKey(kit) && availableKits[kit] > 0 && selectedKits.Count < maxKits && (canAddPerk || canRemovePerk || canRandomizePerk);
+                var canAddKit = whitelisted && !blacklisted && availableKits.ContainsKey(kit) && availableKits[kit] > 0 && selectedKits.Count < maxKits && (canAddPerk || canRemovePerk || canRandomizePerk);
 
                 innerContainer.Add(new CuiElement { Name = $"KitAddButton{kit.ToString()}", Parent = "SELECT_KIT_SB", Components = { new CuiRawImageComponent { Color = canAddKit ? "0.45098 0.55294 0.27059 1" : "0.3 0.3 0.3 1", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0 1", AnchorMax = "0 1", OffsetMin = $"0 -{20 + offset}", OffsetMax = $"20 -{offset}" } } });
                 innerContainer.Add(new CuiPanel { Image = { Color = "1 1 1 1", Sprite = "assets/icons/add.png" }, RectTransform = { AnchorMin = "0 0.5", AnchorMax = "0 0.5", OffsetMin = $"4 -6", OffsetMax = $"16 6" } }, $"KitAddButton{kit.ToString()}", $"KitAddButton{kit.ToString()}_ICON");
@@ -2735,7 +2817,6 @@ namespace Oxide.Plugins
 
         #endregion
 
-
         private ItemPerksConfiguration perkConfig;
 
         #region Item Perk Config
@@ -2970,12 +3051,19 @@ namespace Oxide.Plugins
                 ["UICLOSE"] = "CLOSE",
                 ["UI_OK"] = "OK",
 
-                ["CMDADDPERK_HEADER"] = "Add a random Perk",
-                ["CMDADDPERK_INFO"] = "Select up to {0} Kit(s) to increase your chance for a specific perk to be picked.\n<color=#FF0000>This process can fail!</color>",
-                ["CMDREMOVEPERK_HEADER"] = "Remove a random Perk",
-                ["CMDREMOVEPERK_INFO"] = "Select up to {0} Kit(s) to increase your chance for a specific perk to be picked.\n<color=#FF0000>This process can fail!</color>",
+                ["CAN_FAIL"] = "<color=#FF0000>This process can fail!</color>",
+                ["CMDADDPERK_HEADER"] = "Add a perk to an item",
+                ["CMDADDPERK_INFO_1"] = "Select a kit to add that perk to your item",
+                ["CMDADDPERK_INFO"] = "Adds a perk to your item.\nSelect up to {0} kits, to increase your chance for a specific perk.",
+                
+                ["CMDREMOVEPERK_HEADER"] = "Remove a perk from an item",
+                ["CMDREMOVEPERK_INFO_1"] = "Select a kit to remove that perk from your item",
+                ["CMDREMOVEPERK_INFO"] = "Removes a perk from your item.\nSelect up to {0} kits to increase your chance for a specific perk.",
+
                 ["CMDRANDOMIZEPERKVALUES_HEADER"] = "Reroll perk values",
-                ["CMDRANDOMIZEPERKVALUES_INFO"] = "Select up to {0} Kit(s) to increase your chance for higher values.\n<color=#FF0000>Each kit can only apply to one mod value.</color>",
+                ["CMDRANDOMIZEPERKVALUES_INFO_0"] = "Randomizes the values of perks on that item.",
+                ["CMDRANDOMIZEPERKVALUES_INFO_1"] = "Randomizes the values of perks on that item.\nSelect a kit to increase your chance for higher values.",
+                ["CMDRANDOMIZEPERKVALUES_INFO"] = "Randomizes the values of perks on that item.\nSelect up to {0} kits to increase your chance for higher values.\n<color=#FF0000>Each kit can only apply to one mod value.</color>",
 
                 ["UI_INVENTORY"] = "INVENTORY",
                 ["UI_ITEM_DETAILS_DESCRIPTION"] = "Description",
