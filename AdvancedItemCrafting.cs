@@ -2196,7 +2196,7 @@ namespace Oxide.Plugins
             var failChance = 1f-chanceOffset;
             var failMiddle = chanceOffset + failChance/2;
 
-            builder.Add(new CuiLabel { Text = { Text = $"Random", Font = "robotocondensed-bold.ttf", FontSize = 10, Align = TextAnchor.MiddleCenter, Color = "1 1 1 1" }, RectTransform = { AnchorMin = $"{chanceOffset} 1", AnchorMax = $"1 1", OffsetMin = $"0 -12", OffsetMax = $"0 0" } }, "AI_PERK_CHANCE_BAR", "PERK_TEXT" );
+            builder.Add(new CuiLabel { Text = { Text = $"{lang.GetMessage("RANDOM", this, player.UserIDString)}", Font = "robotocondensed-bold.ttf", FontSize = 10, Align = TextAnchor.MiddleCenter, Color = "1 1 1 1" }, RectTransform = { AnchorMin = $"{chanceOffset} 1", AnchorMax = $"1 1", OffsetMin = $"0 -12", OffsetMax = $"0 0" } }, "AI_PERK_CHANCE_BAR", "PERK_TEXT" );
             builder.Add(new CuiLabel { Text = { Text = $"{Math.Round(failChance * 100, 1)}%", Font = "robotocondensed-bold.ttf", FontSize = 10, Align = TextAnchor.MiddleCenter, Color = "1 1 1 1" }, RectTransform = { AnchorMin = $"{failMiddle} 1", AnchorMax = $"{failMiddle} 1", OffsetMin = $"-30 -26", OffsetMax = $"30 -14" } }, "AI_PERK_CHANCE_BAR", "PERK_PERCENT_TEXT" );
             builder.Add(new CuiElement { Name = "PERK_SPACER_1", Parent = "AI_PERK_CHANCE_BAR", Components = { new CuiRawImageComponent { Color = "1 1 1 1", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = $"{failMiddle} 1", AnchorMax = $"{failMiddle} 1", OffsetMin = $"-1 -33", OffsetMax = $"0 -28" } } });
             builder.Add(new CuiElement { Name = "PERK_SPACER_2", Parent = "AI_PERK_CHANCE_BAR", Components = { new CuiRawImageComponent { Color = "1 1 1 1", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = $"{chanceOffset} 1", AnchorMax = $"1 1", OffsetMin = $"1 -34", OffsetMax = $"-1 -33" } } });
@@ -3048,6 +3048,7 @@ namespace Oxide.Plugins
                 ["UICLOSE"] = "CLOSE",
                 ["UI_OK"] = "OK",
 
+                ["RANDOM"] = "Random",
                 ["CAN_FAIL"] = "<color=#FF0000>This process can fail!</color>",
                 ["CMDADDPERK_HEADER"] = "Add a perk to an item",
                 ["CMDADDPERK_INFO_1"] = "Select a kit to add that perk to your item",
