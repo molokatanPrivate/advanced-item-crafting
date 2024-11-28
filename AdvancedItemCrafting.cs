@@ -16,7 +16,8 @@ using System.Linq;
 using UnityEngine;
 using System.ComponentModel;
 using System.Text;
-
+using System.Runtime.InteropServices;
+using static Oxide.Plugins.AdvancedItemCrafting;
 
 /**
  * This plugin will not do anything standalone.
@@ -403,7 +404,7 @@ namespace Oxide.Plugins
             var maxKits = 1;
             if (isWeighted)
                 maxKits = GetMaxKits(player);
-            else if (action == "cmdrandomizeperkvalues")
+            else if (action == "cmdrandomizeperkvalues" || action == "cmdunveilperk")
                 maxKits = 0;
 
             string headerText = lang.GetMessage( action.ToUpper() + "_HEADER", this, player.UserIDString);
@@ -412,7 +413,8 @@ namespace Oxide.Plugins
 
             ExtendedCuiElementContainer builder = new ExtendedCuiElementContainer();
             SelectPerkBuffsPanel(builder, player, headerText, infoText, baseItem, selectedPerks, maxKits, action, hasPayment);
-            SelectKitPanel(builder, player, SELECT_PERK_BUFF_PANEL, 150, baseItem, selectedPerks, maxKits, action);
+            if (maxKits > 0)
+                SelectKitPanel(builder, player, SELECT_PERK_BUFF_PANEL, 150, baseItem, selectedPerks, maxKits, action);
             if (craftItem != null)
                 AdditionalCostPanel(builder, player, SELECT_PERK_BUFF_PANEL, craftItem, additionalCost, hasPayment);
 
@@ -426,6 +428,37 @@ namespace Oxide.Plugins
             if (player == null) return;
         
             CuiHelper.DestroyUi(player, SELECT_PERK_BUFF_PANEL);
+        }
+
+        
+        [ConsoleCommand("cmdunveilperk")]
+        void CmdUnveilPerk(ConsoleSystem.Arg arg)
+        {
+            var player = arg.Player();
+            if (player == null) return;
+
+            var selectedItemUID = Convert.ToUInt64(arg.Args[0]);
+
+            var itemToMod = player.inventory.FindItemByUID(new ItemId(selectedItemUID));
+            if (itemToMod == null) return;
+            
+            if (!UnveilPerk(player, itemToMod))
+                return;
+            
+            // refeshing inventory to remove payments
+            var playerState = new PlayerState(player);
+            var baseItem = new BaseItem(itemToMod);
+
+            // FIXME: can we reuse open inventory & select item?
+            var builder = new ExtendedCuiElementContainer();
+            CreateInventoryBase(builder, player);
+            CreateInventoryItems(builder, playerState);
+            AddPlayerBuffsPanel(builder, player, playerState);
+
+            CreateItemDetailsBase(builder, player, baseItem);
+            CreateItemActions(builder, player, baseItem);
+
+            CuiHelper.AddUi(player, builder);
         }
 
         [ConsoleCommand("cmdaddperk")]
@@ -548,6 +581,79 @@ namespace Oxide.Plugins
         #endregion Commands
 
         #region Actions
+
+        #region Actions: Unveil
+
+        public bool UnveilPerk(BasePlayer player, Item itemToMod)
+        {
+            BaseItem baseItem = new BaseItem(itemToMod);
+
+            if (!CanReceivePerkBuff(baseItem)) return false;
+
+            CraftItem craftItem = null;
+            int additionalCost = GetCraftItemAmountRequired(craftItem, new List<Perk>());
+            bool hasPayment = craftItem != null ? CraftItemAmountAvailable(player, craftItem) >= additionalCost : true;
+
+            if (!hasPayment) return false;
+
+            var perkWeights = GetAvailablePerkSettingsForItem(baseItem)
+                .ToDictionary(el => el.Key, el => el.Value.perkWeight);
+
+            var totalWeight = perkWeights.Sum(a => a.Value);
+
+            var weighthit = new System.Random().Next((totalWeight));
+
+            Perk perkToAdd = Perk.None;
+            foreach (var perkWeight in perkWeights)
+            {
+                weighthit -= perkWeight.Value;
+                if (weighthit <= 0)
+                {
+                    perkToAdd = perkWeight.Key;
+                    break;
+                }
+            }
+            
+            // FIXME: notify that adding perk failed -> NONE selected
+            if (perkToAdd.Equals(Perk.None)) return false;
+
+            PerkSettings perkMods;
+            if (!perkConfig.enhancementSettings.perk_settings.TryGetValue(perkToAdd, out perkMods)) return false;
+            
+            float mod = (float)Math.Round(UnityEngine.Random.Range(perkMods.min_mod, perkMods.max_mod), 4);
+            
+            // get payment
+            if (craftItem != null)
+                if (!PayItems(player, craftItem.shortname, craftItem.skin, craftItem.display_name, additionalCost)) return false;
+            
+            baseItem.perks.Add(new PerkEntry { Perk = perkToAdd, Value = mod });
+
+            // recreate new perk string
+            string perkString = "";
+            foreach (var perk in baseItem.perks)
+            {
+                perkString += $"[{perk.Perk} {perk.Value}]";
+            }
+
+            if (baseItem.buff == null)
+            {
+                if (baseItem.named)
+                    itemToMod.name = baseItem.DisplayName;
+                else
+                    itemToMod.name = $"{perkConfig.enhancementSettings.item_name_prefix} {itemToMod.info.displayName?.english}";
+            }
+
+            itemToMod.text = perkString;
+            itemToMod.text += "[named]";
+            itemToMod.MarkDirty();
+
+            if (config.craft_settings.add_perk_settings.weight_system.success_effect != null)
+                EffectNetwork.Send(new Effect(config.craft_settings.add_perk_settings.weight_system.success_effect, player.transform.position, player.transform.position), player.net.connection);
+
+            return true;
+        }
+
+        #endregion
 
         #region Actions: Perks
 
@@ -1066,6 +1172,9 @@ namespace Oxide.Plugins
             public float condition;
             public float maxCondition = 0f;
 
+            public bool restricted = false;
+            public bool named = false;
+
             public List<PerkEntry> perks { get; private set; }
             public EpicEntry buff { get; private set; }
 
@@ -1096,6 +1205,15 @@ namespace Oxide.Plugins
                 }
 
                 perks = GetPerks(item);
+
+                if (perks.Count > 0)
+                {
+                    if (item.text.Contains("[named]"))
+                        named = true;
+                    if (item.text.Contains("[restricted]"))
+                        restricted = true;
+                }
+
                 buff = GetEpicBuff(item);
 
                 Slot = item.position;
@@ -1739,7 +1857,14 @@ namespace Oxide.Plugins
             builder.Add(new CuiLabel { Text = { Text = lang.GetMessage( "UI_ITEM_DETAILS_DESCRIPTION", this, player.UserIDString), Font = "robotocondensed-bold.ttf", FontSize = 12, Align = TextAnchor.MiddleLeft, Color = "1 1 1 1" }, RectTransform = { AnchorMin = "0 0", AnchorMax = "1 1", OffsetMin = $"5 0", OffsetMax = $"-5 0" } }, "AI_ITEM_INFO_HEADER", "AI_ITEM_INFO_HEADER_TEXT");
             
             if (item.perks.Count > 0)
-                AddPerkInfo(builder, player, item.perks, "AI_ITEM_INFO", 50);
+            {
+                if (item.named)
+                {
+                    AddNamedPerkInfo(builder, player, item, "AI_ITEM_INFO", 50);
+                }
+                else
+                    AddPerkInfo(builder, player, item.perks, "AI_ITEM_INFO", 50);
+            }
             
             // item actions section
             builder.Add(new CuiElement { Name = "AI_ITEM_ACTIONS", Parent = ITEM_DETAILS_CONTAINER, Components = { new CuiRawImageComponent { Color = "0.969 0.922 0.882 0.055", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "1 0", AnchorMax = "1 0", OffsetMin = $"-158 0", OffsetMax = $"0 178" } } });
@@ -1753,7 +1878,16 @@ namespace Oxide.Plugins
 
             if (ItemPerks != null)
             {
-                if (item.perks.Count > 0 || ((item.buff == null ? config.craft_settings.add_perk_settings.perksForBlankItems : config.craft_settings.add_perk_settings.perksForEpic) && GetAvailablePerksForItem(item).Count > 0))
+                if (item.named)
+                {
+                    if (!item.restricted)
+                    {
+                        if (CanReceivePerkBuff(item))
+                            builder.AddActionButton( lang.GetMessage( "UI_ITEM_DETAILS_UNVEIL_PERK_BUFF", this, player.UserIDString), offset, "assets/icons/examine.png", $"cmdselectperkbuffs {item.uid.Value} cmdunveilperk {CLI.Serialize(new List<Perk>())}", ITEM_ACTIONS_CONTAINER, "ADD_PERK");
+                        offset += 33;
+                    }
+                }
+                else if (item.perks.Count > 0 || ((item.buff == null ? config.craft_settings.add_perk_settings.perksForBlankItems : config.craft_settings.add_perk_settings.perksForEpic) && GetAvailablePerksForItem(item).Count > 0))
                 {
                     if (config.craft_settings.randomize_perk_settings.enabled && permission.UserHasPermission(player.UserIDString, perm_perk_randomize))
                     {
@@ -2062,14 +2196,47 @@ namespace Oxide.Plugins
             }
         }
 
+        public void AddNamedPerkInfo(ExtendedCuiElementContainer builder, BasePlayer player, BaseItem item, string panel, int offset = 50)
+        {
+            int count = 0;
+            foreach(var perk in item.perks)
+            {
+                PerkSettings perkMods;
+                if (!perkConfig.enhancementSettings.perk_settings.TryGetValue(perk.Perk, out perkMods)) continue;
+
+                // actual value
+                // FIXME: retrieve perk values for REGENERATION + suff
+                var perkValue = Math.Round(perk.Value * 100, 2);
+
+                builder.Add(new CuiLabel { Text = { Text = lang.GetMessage("UI" + perk.Perk.ToString(), ItemPerks, player.UserIDString), Font = "robotocondensed-bold.ttf", FontSize = 12, Align = TextAnchor.MiddleRight, Color = "1 1 1 1" }, RectTransform = { AnchorMin = "0 1", AnchorMax = "0.3 1", OffsetMin = $"3 -{offset + 15 + count * 17}", OffsetMax = $"-3 -{offset + count * 17}" } }, panel, "AI_ITEM_PERK" );
+                builder.Add(new CuiElement { Name = "AI_ITEM_PERK_VALUE", Parent = panel, Components = { new CuiTextComponent { Text = $"{GetPerkValue(perk.Value, perk.Perk)}{GetPerkTypeString(perk.Perk)}", Font = "robotocondensed-bold.ttf", FontSize = 12, Align = TextAnchor.MiddleRight, Color = "1 1 1 1" }, new CuiOutlineComponent { Color = "0 0 0 0.5", Distance = "1 -1" }, new CuiRectTransformComponent { AnchorMin = "0.3 1", AnchorMax = "0.9 1", OffsetMin = $"0 -{offset + 15 + count * 17}", OffsetMax = $"3 -{offset + count * 17}" } } });
+                
+                builder.Add(new CuiElement { Name = $"PerkDescriptionBtn{perk.Perk.ToString()}", Parent = panel, Components = { new CuiRawImageComponent { Color = "0.969 0.922 0.882 0.055", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0.9 1", AnchorMax = "0.9 1", OffsetMin = $"4 -{offset + 15 + count * 17}", OffsetMax = $"-21 -{offset + count * 17}" } } });
+                builder.Add(new CuiPanel { Image = { Color = "1 1 1 1", Sprite = "assets/icons/info.png" }, RectTransform = { AnchorMin = "0 0.5", AnchorMax = "0 0.5", OffsetMin = $"2 -6", OffsetMax = $"14 6" } }, $"PerkDescriptionBtn{perk.Perk.ToString()}", $"PerkDescriptionBtn{perk.Perk.ToString()}_ICON");
+                builder.Add(new CuiButton { Button = { Color = "0 0 0 0", Command = $"cmdshowperkinfopanel {perk.Perk.ToString()}" }, RectTransform = { AnchorMin = "0 0.5", AnchorMax = "0 0.5", OffsetMin = "2 -6", OffsetMax = "14 6" } }, $"PerkDescriptionBtn{perk.Perk.ToString()}", $"PerkDescriptionBtn{perk.Perk.ToString()}_BTN");
+
+                count++;
+            }
+
+            if (!item.named || item.restricted)
+            {
+                builder.Add(new CuiLabel { Text = { Text = $"{lang.GetMessage("UI_ITEM_DETAILS_RESTRICTED", this, player.UserIDString)}", Font = "robotocondensed-bold.ttf", FontSize = 14, Align = TextAnchor.MiddleCenter, Color = "1 0 0 0.5" }, RectTransform = { AnchorMin = "0 1", AnchorMax = "1 1", OffsetMin = $"3 -{offset + 20 + 119}", OffsetMax = $"-3 -{offset + 119}" } }, panel, "AI_ITEM_PERK" );
+                return;
+            }
+
+            for (var i = count; i<config.craft_settings.add_perk_settings.maxPossiblePerks; i++)
+            {
+                builder.Add(new CuiLabel { Text = { Text = "???", Font = "robotocondensed-bold.ttf", FontSize = 12, Align = TextAnchor.MiddleRight, Color = "1 1 1 0.3" }, RectTransform = { AnchorMin = "0 1", AnchorMax = "0.3 1", OffsetMin = $"3 -{offset + 15 + i * 17}", OffsetMax = $"-3 -{offset + i * 17}" } }, panel, "AI_ITEM_PERK" );
+                builder.Add(new CuiElement { Name = "AI_ITEM_PERK_VALUE", Parent = panel, Components = { new CuiTextComponent { Text = "??", Font = "robotocondensed-bold.ttf", FontSize = 12, Align = TextAnchor.MiddleRight, Color = "1 1 1 0.3" }, new CuiOutlineComponent { Color = "0 0 0 0.5", Distance = "1 -1" }, new CuiRectTransformComponent { AnchorMin = "0.3 1", AnchorMax = "0.9 1", OffsetMin = $"0 -{offset + 15 + i * 17}", OffsetMax = $"3 -{offset + i * 17}" } } });
+            }
+        }
         public void SelectPerkBuffsPanel(ExtendedCuiElementContainer builder, BasePlayer player, string headerText, string bodyText, BaseItem itemToMod, List<Perk> selectedKits, int maxKits, string action, bool hasPayment = true)
         {
             var kitItem = new BaseItem(ItemManager.CreateByName(perkConfig.enhancementSettings.enhancement_kit_settings.shortname, 1, perkConfig.enhancementSettings.enhancement_kit_settings.skin));
             var isWeighted = IsWeightedAction(player, action);
             var showChances = isWeighted && action != "cmdrandomizeperkvalues";
             var requiresKit = isWeighted && RequiresKit(action);
-
-            var height = (58 + 226 + (itemToMod.perks.Count * 17) + 12 + (showChances ? 55 : 0))/2;
+            var height = (58 + 226 + (config.craft_settings.add_perk_settings.maxPossiblePerks * 17) + 12 + (showChances ? 55 : 0))/2;
 
             builder.Add(new CuiElement { Name = SELECT_PERK_BUFF_PANEL, Parent = BACKDROP_PANEL, Components = { new CuiImageComponent { Color = "0 0 0 0.95", Material = "assets/content/ui/uibackgroundblur-ingamemenu.mat" }, new CuiRectTransformComponent { AnchorMin = "0 0", AnchorMax = "1 1", OffsetMin = $"0 0", OffsetMax = $"0 0" } }, DestroyUi = SELECT_PERK_BUFF_PANEL });
             builder.Add(new CuiElement { Name = "SELECT_PERK_BUFFS_BACKDROP", Parent = SELECT_PERK_BUFF_PANEL, Components = { new CuiRawImageComponent { Color = "0 0 0 1", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0.5 0.5", AnchorMax = "0.5 0.5", OffsetMin = $"-202 -{height}", OffsetMax = $"202 {height}" } } });
@@ -2144,7 +2311,10 @@ namespace Oxide.Plugins
 
             // perk info
             builder.Add(new CuiElement { Name = $"ItemPerks", Parent = "BodyPanel", Components = { new CuiRawImageComponent { Color = "0 0 0 0", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0.5 1", AnchorMax = "0.5 1", OffsetMin = $"-110 -{226 + (itemToMod.perks.Count * 17) + (showChances ? 55 : 0)}", OffsetMax = $"100 -{226 + (showChances ? 55 : 0)}" } } });
-            AddPerkInfo(builder, player, itemToMod.perks, "ItemPerks", 0);
+            if (itemToMod.named)
+                AddNamedPerkInfo(builder, player, itemToMod, "ItemPerks", 0);
+            else
+                AddPerkInfo(builder, player, itemToMod.perks, "ItemPerks", 0);
 
             // footer
             builder.Add(new CuiPanel { Image = { Color = "0.969 0.922 0.882 0.11" }, RectTransform = { AnchorMin = "0.5 0.5", AnchorMax = "0.5 0.5", OffsetMin = $"-200 -{height-2}", OffsetMax = $"200 -{height-32}" } }, "SELECT_PERK_BUFFS_BACKDROP", "ActionsPanel");
@@ -3062,15 +3232,20 @@ namespace Oxide.Plugins
                 ["CMDRANDOMIZEPERKVALUES_INFO_0"] = "Randomizes the values of perks on that item.",
                 ["CMDRANDOMIZEPERKVALUES_INFO_1"] = "Randomizes the values of perks on that item.\nSelect a kit to increase your chance for higher values.",
                 ["CMDRANDOMIZEPERKVALUES_INFO"] = "Randomizes the values of perks on that item.\nSelect up to {0} kits to increase your chance for higher values.\n<color=#FF0000>Each kit can only apply to one mod value.</color>",
+                
+                ["CMDUNVEILPERK_HEADER"] = "Unveil a hidden perk.",
+                ["CMDUNVEILPERK_INFO_0"] = "A hidden perk will be revealed and added permanent to the item.",
 
                 ["UI_INVENTORY"] = "INVENTORY",
                 ["UI_ITEM_DETAILS_DESCRIPTION"] = "Description",
+                ["UI_ITEM_DETAILS_RESTRICTED"] = "Cannot be modified",
                 ["UI_ITEM_DETAILS_ACTIONS"] = "Actions",
                 ["UI_ITEM_DETAILS_ADD_EPIC_BUFF"] = "Add Epic Buff",
                 ["UI_ITEM_DETAILS_RECYCLE_EPIC"] = "Recycle Item",
                 ["UI_ITEM_DETAILS_ADD_PERK_BUFF"] = "Add Perk",
                 ["UI_ITEM_DETAILS_REMOVE_PERK"] = "Remove Perk",
                 ["UI_ITEM_DETAILS_RANDOMIZE_PERKS"] = "Reroll Perk Values",
+                ["UI_ITEM_DETAILS_UNVEIL_PERK_BUFF"] = "Unveil Perk",
 
                 ["UI_PLAYERBUFFS_TITLE"] = "PLAYER BUFFS",
                 ["UI_PLAYERBUFFS_EPIC"] = "Epic Buffs",
