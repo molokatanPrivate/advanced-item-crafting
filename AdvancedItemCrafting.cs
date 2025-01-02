@@ -34,7 +34,7 @@ using System.Text;
  **/
 namespace Oxide.Plugins
 {
-    [Info("AdvancedItemCrafting", "molokatan", "0.9.3"), Description("User Interface and advanced crafting options for Item Perks and Epic Loot")]
+    [Info("AdvancedItemCrafting", "molokatan", "1.0.0"), Description("User Interface and advanced crafting options for Item Perks and Epic Loot")]
     class AdvancedItemCrafting : RustPlugin
     {
         [PluginReference]
