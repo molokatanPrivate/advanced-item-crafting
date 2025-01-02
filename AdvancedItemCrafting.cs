@@ -1,23 +1,15 @@
-using Facepunch;
-using Facepunch.Rust;
 using Oxide.Core;
-using Oxide.Core.Configuration;
 using Oxide.Core.Plugins;
 using Oxide.Game.Rust.Cui;
-using Rust;
 
 using Newtonsoft.Json;
-using Network;
 using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using UnityEngine;
-using System.ComponentModel;
 using System.Text;
-using System.Runtime.InteropServices;
-using static Oxide.Plugins.AdvancedItemCrafting;
 
 /**
  * This plugin will not do anything standalone.
@@ -54,6 +46,8 @@ namespace Oxide.Plugins
         const string perm_perk_randomize = "advanceditemcrafting.perk.randomize";
         // permission to bypass weight system
         const string perm_perk_bypass_weighting = "advanceditemcrafting.perk.bypass_weighting";
+
+        const string perm_named_unveil = "advanceditemcrafting.named.unveil";
 
         // amount usable kits for perk crafts if weighted
         const string perm_kit_2 = "advanceditemcrafting.perk.kit2";
@@ -166,6 +160,7 @@ namespace Oxide.Plugins
             permission.RegisterPermission(perm_perk_remove, this);
             permission.RegisterPermission(perm_perk_randomize, this);
             permission.RegisterPermission(perm_perk_bypass_weighting, this);
+            permission.RegisterPermission(perm_named_unveil, this);
 
             permission.RegisterPermission(perm_kit_2, this);
             permission.RegisterPermission(perm_kit_3, this);
@@ -415,7 +410,7 @@ namespace Oxide.Plugins
             SelectPerkBuffsPanel(builder, player, headerText, infoText, baseItem, selectedPerks, maxKits, action, hasPayment);
             if (maxKits > 0)
                 SelectKitPanel(builder, player, SELECT_PERK_BUFF_PANEL, 150, baseItem, selectedPerks, maxKits, action);
-            if (craftItem != null)
+            if (craftItem != null && additionalCost > 0)
                 AdditionalCostPanel(builder, player, SELECT_PERK_BUFF_PANEL, craftItem, additionalCost, hasPayment);
 
             CuiHelper.AddUi(player, builder);
@@ -590,8 +585,8 @@ namespace Oxide.Plugins
 
             if (!CanReceivePerkBuff(baseItem)) return false;
 
-            CraftItem craftItem = null;
-            int additionalCost = GetCraftItemAmountRequired(craftItem, new List<Perk>());
+            CraftItem craftItem = config.craft_settings.unveil_perk_settings.craft_item;
+            int additionalCost = GetCraftItemAmountRequired(craftItem);
             bool hasPayment = craftItem != null ? CraftItemAmountAvailable(player, craftItem) >= additionalCost : true;
 
             if (!hasPayment) return false;
@@ -647,8 +642,8 @@ namespace Oxide.Plugins
             itemToMod.text += "[named]";
             itemToMod.MarkDirty();
 
-            if (config.craft_settings.add_perk_settings.weight_system.success_effect != null)
-                EffectNetwork.Send(new Effect(config.craft_settings.add_perk_settings.weight_system.success_effect, player.transform.position, player.transform.position), player.net.connection);
+            if (config.craft_settings.unveil_perk_settings.success_effect != null)
+                EffectNetwork.Send(new Effect(config.craft_settings.unveil_perk_settings.success_effect, player.transform.position, player.transform.position), player.net.connection);
 
             return true;
         }
@@ -1067,16 +1062,21 @@ namespace Oxide.Plugins
                     return config.craft_settings.remove_perk_settings.craft_item;
                 case "cmdrandomizeperkvalues":
                     return config.craft_settings.randomize_perk_settings.randomize_perk_item;
+                case "cmdunveilperk":
+                    return config.craft_settings.unveil_perk_settings.craft_item;
                 default:
                     return null;
             }
         }
 
-        int GetCraftItemAmountRequired(CraftItem item, List<Perk> selectedPerks)
+        int GetCraftItemAmountRequired(CraftItem item, List<Perk> selectedPerks = null)
         {
             if (item == null) return 0;
 
             int amountRequired = item.amount;
+
+            if (selectedPerks == null) return amountRequired;
+
             foreach (Perk perk in selectedPerks)
                 if (item.cost_per_kit.TryGetValue(perk, out var value)) amountRequired += value;
 
@@ -1116,7 +1116,7 @@ namespace Oxide.Plugins
 
         public bool PayItems(BasePlayer player, string shortname, ulong skin, string name, int amount)
         {
-            if (permission.UserHasPermission(player.UserIDString, perm_enhance_free)) return true;
+            if (permission.UserHasPermission(player.UserIDString, perm_enhance_free) || amount == 0) return true;
             
             // we want to see first if the player has the required amount -> safe remvoe
             if (ItemAmountAvailable(player, shortname, skin, name) < amount) return false;
@@ -1842,7 +1842,7 @@ namespace Oxide.Plugins
         public void CreateItemDetailsBase(ExtendedCuiElementContainer builder, BasePlayer player, BaseItem item)
         {
             builder.Add(new CuiPanel { Image = { Color = "0 0 0 0" }, RectTransform = { AnchorMin = "0.5 0", AnchorMax = "0.5 0", OffsetMin = $"-200 363", OffsetMax = $"180 625" } }, BACKDROP_PANEL, ITEM_DETAILS_CONTAINER, ITEM_DETAILS_CONTAINER);
-
+            
             builder.Add(new CuiElement { Name = "AI_ITEM_NAME", Parent = ITEM_DETAILS_CONTAINER, Components = { new CuiTextComponent { Text = item.DisplayName.ToUpper(), Font = "robotocondensed-bold.ttf", FontSize = 20, Align = TextAnchor.MiddleLeft, Color = "1 1 1 1" }, new CuiOutlineComponent { Color = "0 0 0 0.5", Distance = "1 -1" }, new CuiRectTransformComponent { AnchorMin = "0 1", AnchorMax = "1 1", OffsetMin = "0 0", OffsetMax = "0 30" } } });
             builder.Add(new CuiElement { Name = "AI_ITEM_DESCRIPTION", Parent = ITEM_DETAILS_CONTAINER, Components = { new CuiRawImageComponent { Color = "0.969 0.922 0.882 0.055", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0 1", AnchorMax = "1 1", OffsetMin = $"0 -60", OffsetMax = $"0 0" } } });
             builder.Add(new CuiLabel { Text = { Text = item.Description, Font = "robotocondensed-regular.ttf", FontSize = 10, Align = TextAnchor.UpperLeft, Color = "1 1 1 1" }, RectTransform = { AnchorMin = "0 0", AnchorMax = "1 1", OffsetMin = $"5 5", OffsetMax = $"-65 -5" } }, "AI_ITEM_DESCRIPTION", "AI_ITEM_DESCRIPTION_TEXT");
@@ -1880,7 +1880,7 @@ namespace Oxide.Plugins
             {
                 if (item.named)
                 {
-                    if (!item.restricted)
+                    if (!item.restricted && config.craft_settings.unveil_perk_settings.enabled && permission.UserHasPermission(player.UserIDString, perm_named_unveil))
                     {
                         if (CanReceivePerkBuff(item))
                             builder.AddActionButton( lang.GetMessage( "UI_ITEM_DETAILS_UNVEIL_PERK_BUFF", this, player.UserIDString), offset, "assets/icons/examine.png", $"cmdselectperkbuffs {item.uid.Value} cmdunveilperk {CLI.Serialize(new List<Perk>())}", ITEM_ACTIONS_CONTAINER, "ADD_PERK");
@@ -2218,7 +2218,7 @@ namespace Oxide.Plugins
                 count++;
             }
 
-            if (!item.named || item.restricted)
+            if (!item.named || item.restricted || !config.craft_settings.unveil_perk_settings.enabled || !permission.UserHasPermission(player.UserIDString, perm_named_unveil) || item.perks.Count >= config.craft_settings.add_perk_settings.maxPossiblePerks)
             {
                 builder.Add(new CuiLabel { Text = { Text = $"{lang.GetMessage("UI_ITEM_DETAILS_RESTRICTED", this, player.UserIDString)}", Font = "robotocondensed-bold.ttf", FontSize = 14, Align = TextAnchor.MiddleCenter, Color = "1 0 0 0.5" }, RectTransform = { AnchorMin = "0 1", AnchorMax = "1 1", OffsetMin = $"3 -{offset + 20 + 119}", OffsetMax = $"-3 -{offset + 119}" } }, panel, "AI_ITEM_PERK" );
                 return;
@@ -2230,6 +2230,7 @@ namespace Oxide.Plugins
                 builder.Add(new CuiElement { Name = "AI_ITEM_PERK_VALUE", Parent = panel, Components = { new CuiTextComponent { Text = "??", Font = "robotocondensed-bold.ttf", FontSize = 12, Align = TextAnchor.MiddleRight, Color = "1 1 1 0.3" }, new CuiOutlineComponent { Color = "0 0 0 0.5", Distance = "1 -1" }, new CuiRectTransformComponent { AnchorMin = "0.3 1", AnchorMax = "0.9 1", OffsetMin = $"0 -{offset + 15 + i * 17}", OffsetMax = $"3 -{offset + i * 17}" } } });
             }
         }
+
         public void SelectPerkBuffsPanel(ExtendedCuiElementContainer builder, BasePlayer player, string headerText, string bodyText, BaseItem itemToMod, List<Perk> selectedKits, int maxKits, string action, bool hasPayment = true)
         {
             var kitItem = new BaseItem(ItemManager.CreateByName(perkConfig.enhancementSettings.enhancement_kit_settings.shortname, 1, perkConfig.enhancementSettings.enhancement_kit_settings.skin));
@@ -2733,6 +2734,9 @@ namespace Oxide.Plugins
 
             [JsonProperty("Upgrade Perk Tier")]
             public UpgradePerkTierConfig upgrade_perk_settings = new UpgradePerkTierConfig();
+
+            [JsonProperty("Unveil Perk")]
+            public UnveilPerkSettings unveil_perk_settings = new UnveilPerkSettings();
         }
 
         public class AddPerkSettings
@@ -2835,6 +2839,18 @@ namespace Oxide.Plugins
 
             [JsonProperty("Use weighting to select a perk")]
             public WeightRolls weight_system = new WeightRolls();
+        }
+
+        public class UnveilPerkSettings
+        {
+            [JsonProperty("enabled")]
+            public bool enabled = true;
+
+            [JsonProperty("Item to use when unveiling a perk")]
+            public CraftItem craft_item = new CraftItem();
+
+            [JsonProperty("Effect played when kit mod was revealed")]
+            public string success_effect = "assets/prefabs/misc/halloween/lootbag/effects/gold_open.prefab";
         }
 
         public class CraftItem
@@ -3112,6 +3128,8 @@ namespace Oxide.Plugins
                 config.craft_settings.randomize_perk_settings.randomize_perk_item.cost_per_kit.Add(perk, 0);
                 config.craft_settings.upgrade_perk_settings.craft_item.cost_per_kit.Add(perk, 0);
             }
+
+            config.craft_settings.unveil_perk_settings.craft_item.amount = 0;
         }
 
         private IEnumerator LoadEpicConfiguration()

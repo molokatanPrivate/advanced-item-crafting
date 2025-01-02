@@ -171,6 +171,7 @@ You can then give perk.kit2 permission when the player reaches level 20 with ski
 | perk.bypass_weighting		| the player can use direct crafting for perks		|
 | perk.kit2					| the player has 2 kit slots for weighted crafting	|
 | perk.kit3					| the player has 3 kit slots for weighted crafting	|
+| named.unveil				| the player can unveil perks on a named item		|
 | epic.salvage				| the player can salvage epic items from menu		|
 | epic.enhance				| the player can add epic buffs to items			|
 | free						| the player can modify all items for free			|
@@ -194,6 +195,15 @@ The default costs is set to use epic scrap.
 *If your server is not supporting epic, you should change that.*
 
 Additional costs can be increased for each kit used during crafting process depending on the perk of the kit.
+
+### Named Items
+Named items can be restricted and unrestricted.
+If restricted, the player cant reveal additional perks.
+For unrestricted items, the player can unveil additional perks, if the total amount of perks is not exceeding the max allowed number.
+Additional costs can be defined according to other perk crafting actions.
+
+The player will not be able to improve chances with kits.
+Kits are disabled and rolls rely fully on perk weights.
 
 ## Translations
 You will find out when looking into the language file, that this plugin barely uses translations.
