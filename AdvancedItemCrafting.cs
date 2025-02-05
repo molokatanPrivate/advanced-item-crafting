@@ -8,13 +8,14 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using UnityEngine;
 using System.Text;
+
+using UnityEngine;
 
 /**
  * This plugin will not do anything standalone.
  * 
- * You need latest Epic Items and Item Perks installed.
+ * You need latest Epic Items or Item Perks installed.
  * - configurations for epic buffs are maintained in Epic Items
  * - epic buff effects are handled by Epic Items
  * - configurations for perk buffs are maintained in Item Perks
@@ -24,17 +25,18 @@ using System.Text;
  * TODOs by priority:
  * - stacked items?
  * - remove inconsitencies when using CuiPanel etc
- * - clean up imports
  * - revise UI component names and coords
  * 
  * possible Features/Ideas
- * - Crafting XP -> used to unlock features?
  * - support for Item Retriever
  * - support for economics and stuff -> might be needed by some servers (even when i dont like it^^)
+ * - Crafting XP -> used to unlock features?
+ * - Admin Inventory Inspector -> to look into players inventory and validate items
+ * - dont show costs if permission "free" is assigned -> maybe alternate text?
  **/
 namespace Oxide.Plugins
 {
-    [Info("AdvancedItemCrafting", "molokatan", "1.0.0"), Description("User Interface and advanced crafting options for Item Perks and Epic Loot")]
+    [Info("AdvancedItemCrafting", "molokatan", "1.0.1"), Description("User Interface and advanced crafting options for Item Perks and Epic Loot")]
     class AdvancedItemCrafting : RustPlugin
     {
         [PluginReference]
@@ -58,6 +60,8 @@ namespace Oxide.Plugins
         const string perm_enhance = "advanceditemcrafting.epic.enhance";
         // FIXME: need to check behavior for kits
         const string perm_enhance_free = "advanceditemcrafting.free";
+
+        const string perm_settings_hide_button = "advanceditemcrafting.settings.hide_button";
 
         // FIXME: this instance should be removed if possible
         public static AdvancedItemCrafting Instance { get; set; }
@@ -129,12 +133,6 @@ namespace Oxide.Plugins
         {
             CreateMainButton(player);
         }
-
-        // do we need this?
-        /**void OnPlayerConnected(BasePlayer player)
-        {
-            CreateMainButton(player);
-        }**/
         
         void OnPlayerSleepEnded(BasePlayer player)
         {
@@ -168,6 +166,8 @@ namespace Oxide.Plugins
             permission.RegisterPermission(perm_salvage, this);
             permission.RegisterPermission(perm_enhance, this);
             permission.RegisterPermission(perm_enhance_free, this);
+
+            permission.RegisterPermission(perm_settings_hide_button, this);
         }
 
         int GetMaxKits(BasePlayer player)
@@ -179,6 +179,9 @@ namespace Oxide.Plugins
         #endregion Permissions
 
         #region Commands
+
+        #region Commands:Inventory
+
         void ChatOpenInventory(BasePlayer player)
         {
             if (player == null) return;
@@ -210,6 +213,72 @@ namespace Oxide.Plugins
             CuiHelper.DestroyUi(player, BACKDROP_PANEL);
         }
 
+        #endregion Commands:Inventory
+
+        #region Commands:Settings
+
+        [ConsoleCommand("cmdopenaisettings")]
+        void CmdOpenSettings(ConsoleSystem.Arg arg)
+        {
+            var player = arg.Player();
+            if (player == null) return;
+
+            var builder = new ExtendedCuiElementContainer();
+
+            CreateSettingsBox(builder, player);
+
+            CuiHelper.AddUi(player, builder);
+        }
+
+        [ConsoleCommand("cmdcloseaisettings")]
+        void CmdCloseSettings(ConsoleSystem.Arg arg)
+        {
+            var player = arg.Player();
+            if (player == null) return;
+            
+            CuiHelper.DestroyUi(player, "AI_SETTINGS_BOX");
+        }
+
+        [ConsoleCommand("cmdtoggleaisetting")]
+        void CmdToggleSettings(ConsoleSystem.Arg arg)
+        {
+            var player = arg.Player();
+            if (player == null) return;
+            
+            string setting = arg.Args[0];
+
+            switch (setting)
+            {
+                case "mainbutton":
+                    TogglePermission(player, perm_settings_hide_button);
+                    CreateMainButton(player);
+                    break;
+                // might add more settings later
+            }
+
+            var playerState = new PlayerState(player);
+
+            var builder = new ExtendedCuiElementContainer();
+            CreateInventoryBase(builder, player);
+            CreateInventoryItems(builder, playerState);
+
+            AddPlayerBuffsPanel(builder, player, playerState);
+
+            CreateSettingsBox(builder, player);
+
+            CuiHelper.AddUi(player, builder);
+        }
+
+        private void TogglePermission(BasePlayer player, string perm)
+        {
+            if (permission.UserHasPermission(player.UserIDString, perm))
+                permission.RevokeUserPermission(player.UserIDString, perm);
+            else
+                permission.GrantUserPermission(player.UserIDString, perm, null);
+        }
+
+        #endregion Commands:Settings
+
         [ConsoleCommand("cmdselectitem")]
         void CmdSelectItem(ConsoleSystem.Arg arg)
         {
@@ -229,7 +298,7 @@ namespace Oxide.Plugins
             
             AddEpicBuffDetailsPanel(builder);
 
-            if (baseItem.buff != null)
+            if (baseItem.buff != null && EpicLoot != null)
             {
                 EpicBuffDescription(builder, player, baseItem.buff.Buff);
             }
@@ -421,8 +490,25 @@ namespace Oxide.Plugins
         {
             var player = arg.Player();
             if (player == null) return;
-        
-            CuiHelper.DestroyUi(player, SELECT_PERK_BUFF_PANEL);
+
+            // reload to make sure that inventory is updated
+            var playerState = new PlayerState(player);
+            var builder = new ExtendedCuiElementContainer();
+
+            CreateInventoryBase(builder, player);
+            CreateInventoryItems(builder, playerState);
+            AddPlayerBuffsPanel(builder, player, playerState);
+            
+            if (arg.Args.Count() > 0)
+            {
+                var selectedItemUID = Convert.ToUInt64(arg.Args[0]);
+                var itemToMod = player.inventory.FindItemByUID(new ItemId(selectedItemUID));
+                var baseItem = new BaseItem(itemToMod);
+                CreateItemDetailsBase(builder, player, baseItem);
+                CreateItemActions(builder, player, baseItem);
+            }
+
+            CuiHelper.AddUi(player, builder);
         }
 
         
@@ -506,20 +592,8 @@ namespace Oxide.Plugins
             
             if (!RandomizePerkValues(player, itemToMod, selectedPerks)) return;
 
-            // refeshing inventory to remove payments
-            var playerState = new PlayerState(player);
-            var baseItem = new BaseItem(itemToMod);
-
-            // FIXME: can we reuse open inventory & select item?
-            var builder = new ExtendedCuiElementContainer();
-            CreateInventoryBase(builder, player);
-            CreateInventoryItems(builder, playerState);
-            AddPlayerBuffsPanel(builder, player, playerState);
-
-            CreateItemDetailsBase(builder, player, baseItem);
-            CreateItemActions(builder, player, baseItem);
-
-            CuiHelper.AddUi(player, builder);
+            // now we reopen the selection
+            player.SendConsoleCommand("cmdselectperkbuffs", itemToMod.uid.Value, "cmdrandomizeperkvalues", CLI.Serialize(new List<Perk>()));
         }
         
         [ConsoleCommand("cmdremoveperk")]
@@ -1635,7 +1709,11 @@ namespace Oxide.Plugins
         #region UIBuilder
         public void CreateMainButton(BasePlayer player)
         {
-            if (!config.customButton.enabled) return;
+            if (!config.customButton.enabled || permission.UserHasPermission(player.UserIDString, perm_settings_hide_button))
+            {
+                CuiHelper.DestroyUi(player, MAIN_BUTTON);
+                return;
+            }
 
             ExtendedCuiElementContainer builder = new ExtendedCuiElementContainer();
             builder.Add(new CuiPanel { Image = { Color = config.customButton.BackgroundColor }, RectTransform = { AnchorMin = config.customButton.AnchorMin, AnchorMax = config.customButton.AnchorMax, OffsetMin = config.customButton.OffsetMin, OffsetMax = config.customButton.OffsetMax } }, config.customButton.Parent, MAIN_BUTTON);
@@ -1652,6 +1730,33 @@ namespace Oxide.Plugins
             CuiHelper.AddUi(player, builder);
         }
 
+        public void CreateSettingsBox(ExtendedCuiElementContainer builder, BasePlayer player)
+        {
+            var bodyHeight = 74;
+            var height = (58 + bodyHeight)/2;
+
+            builder.Add(new CuiElement { Name = "AI_SETTINGS_BOX", Parent = BACKDROP_PANEL, Components = { new CuiImageComponent { Color = "0 0 0 0.95", Material = "assets/content/ui/uibackgroundblur-ingamemenu.mat" }, new CuiRectTransformComponent { AnchorMin = "0 0", AnchorMax = "1 1", OffsetMin = $"0 0", OffsetMax = $"0 0" } }, DestroyUi = "AI_SETTINGS_BOX" });
+            builder.Add(new CuiElement { Name = "AI_SETTINGS_BOX_BACKDROP", Parent = "AI_SETTINGS_BOX", Components = { new CuiRawImageComponent { Color = "0 0 0 1", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0.5 0.5", AnchorMax = "0.5 0.5", OffsetMin = $"-142 -{height}", OffsetMax = $"142 {height}" } } });
+            
+            builder.Add(new CuiElement { Name = $"HeaderSettingsPanel", Parent = "AI_SETTINGS_BOX_BACKDROP", Components = { new CuiRawImageComponent { Color = "0.969 0.922 0.882 0.11", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0.5 0.5", AnchorMax = "0.5 0.5", OffsetMin = $"-140 {height-22}", OffsetMax = $"140 {height-2}" } } });
+            builder.Add(new CuiLabel { Text = { Text = lang.GetMessage("UI_SETTINGS_HEADER", this, player.UserIDString), Font = "robotocondensed-bold.ttf", FontSize = 14, Align = TextAnchor.MiddleLeft, Color = "1 1 1 1" }, RectTransform = { AnchorMin = $"0 0", AnchorMax = $"1 1", OffsetMin = $"6 0", OffsetMax = $"-6 0" } }, $"HeaderSettingsPanel", "HeaderSettingsPanel_Text" );
+            
+            builder.Add(new CuiElement { Name = $"BodySettingsPanel", Parent = "AI_SETTINGS_BOX_BACKDROP", Components = { new CuiRawImageComponent { Color = "0.969 0.922 0.882 0.055", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0.5 0.5", AnchorMax = "0.5 0.5", OffsetMin = $"-140 -{height-33}", OffsetMax = $"140 {height-23}" } } });
+
+            // toggle for main button
+            var mainBtnEnabled = !permission.UserHasPermission(player.UserIDString, perm_settings_hide_button);
+
+            builder.Add(new CuiPanel { Image = { Color = "0.969 0.922 0.882 0.22" }, RectTransform = { AnchorMin = "0 1", AnchorMax = "0 1", OffsetMin = $"10 -26", OffsetMax = $"50 -8" } }, "BodySettingsPanel", "ToggleButtonPanel");
+            builder.Add(new CuiPanel { Image = { Color = (mainBtnEnabled ? "0.45098 0.55294 0.27059 1" : "0.77255 0.23922 0.15686 1") }, RectTransform = { AnchorMin = "0 0", AnchorMax = "1 1", OffsetMin = $"{(mainBtnEnabled ? 15 : 2)} 2", OffsetMax = $"{(mainBtnEnabled ? -2 : -15)} -2" } }, "ToggleButtonPanel", "ToggleButtonPanelStatus");
+            builder.Add(new CuiButton { Button = { Color = "0 0 0 0", Command = $"cmdtoggleaisetting mainbutton" }, Text = { Text = "", Font = "robotocondensed-regular.ttf", FontSize = 16, Align = TextAnchor.MiddleCenter, Color = "1 1 1 1" }, RectTransform = { AnchorMin = "0 0", AnchorMax = "1 1", OffsetMin = "0 0", OffsetMax = "0 0" } }, "ToggleButtonPanel", "ToggleButtonPanelBtn");
+            builder.Add(new CuiLabel { Text = { Text = lang.GetMessage("UI_SETTINGS_TOGGLE_MAIN_BUTTON", this, player.UserIDString), Font = "robotocondensed-regular.ttf", FontSize = 14, Align = TextAnchor.MiddleLeft, Color = "1 1 1 1" }, RectTransform = { AnchorMin = $"0 1", AnchorMax = $"1 1", OffsetMin = $"70 -29", OffsetMax = $"-10 -5" } }, $"BodySettingsPanel", "ToggleButtonPanel_Text" );
+
+        
+            builder.Add(new CuiPanel { Image = { Color = "0.969 0.922 0.882 0.11" }, RectTransform = { AnchorMin = "0.5 0.5", AnchorMax = "0.5 0.5", OffsetMin = $"-140 -{height-2}", OffsetMax = $"140 -{height-32}" } }, "AI_SETTINGS_BOX_BACKDROP", "ActionsSettingsPanel");
+            builder.Add(new CuiButton { Button = { Color = "0.45098 0.55294 0.27059 1", Command = $"cmdcloseaisettings" }, Text = { Text = lang.GetMessage("UICLOSE", this, player.UserIDString), Font = "robotocondensed-regular.ttf", FontSize = 16, Align = TextAnchor.MiddleCenter, Color = "1 1 1 1" }, RectTransform = { AnchorMin = "0.2 0", AnchorMax = "0.8 1", OffsetMin = "10 5", OffsetMax = "-10 -5" } }, "ActionsSettingsPanel", "CloseSettingsPanelButton");
+        }
+
+
         public void CreateInventoryBase(ExtendedCuiElementContainer builder, BasePlayer player)
         {
             // backdrop
@@ -1661,6 +1766,14 @@ namespace Oxide.Plugins
             builder.Add(new CuiPanel { Image = { Color = "0.969 0.922 0.882 0.11" }, RectTransform = { AnchorMin = "0.5 0", AnchorMax = "0.5 0", OffsetMin = "-383 76", OffsetMax = "-213 112" } }, BACKDROP_PANEL, CLOSE_BUTTON);
             builder.Add(new CuiButton { Button = { Color = "0.3 0.3 0.3 1", Command = CLOSE_COMMAND }, Text = { Text = lang.GetMessage("UICLOSE", this, player.UserIDString), Font = "robotocondensed-bold.ttf", FontSize = 20, Align = TextAnchor.MiddleCenter, Color = "1 1 1 1" }, RectTransform = { AnchorMin = "0 0", AnchorMax = "1 1", OffsetMin = "10 5", OffsetMax = "-10 -5" } }, CLOSE_BUTTON, $"{CLOSE_BUTTON}_Btn");
 
+            if (config.customButton.enabled)
+            {
+                // settings button
+                builder.Add(new CuiPanel { Image = { Color = "0.969 0.922 0.882 0.11" }, RectTransform = { AnchorMin = "0.5 0", AnchorMax = "0.5 0", OffsetMin = "-422 76", OffsetMax = "-386 112" } }, BACKDROP_PANEL, SETTINGS_BUTTON);
+                builder.Add(new CuiPanel { Image = { Color = "1 1 1 1", Sprite = "assets/icons/gear.png" }, RectTransform = { AnchorMin = "0 0", AnchorMax = "1 1", OffsetMin = $"5 5", OffsetMax = $"-5 -5" } }, SETTINGS_BUTTON, $"{SETTINGS_BUTTON}_ICON");
+                builder.Add(new CuiButton { Button = { Color = "0 0 0 0", Command = "cmdopenaisettings" }, Text = { Text = "", Font = "robotocondensed-bold.ttf", FontSize = 20, Align = TextAnchor.MiddleCenter, Color = "1 1 1 1" }, RectTransform = { AnchorMin = "0 0", AnchorMax = "1 1", OffsetMin = "5 5", OffsetMax = "-5 -5" } }, SETTINGS_BUTTON, $"{SETTINGS_BUTTON}_Btn");
+            }
+            
             // belt slots
             builder.Add(new CuiPanel { RectTransform = { AnchorMin = "0.5 0", AnchorMax = "0.5 0", OffsetMin = "-200 18", OffsetMax = "185 18" } }, BACKDROP_PANEL, BELT_PANEL);
             for (int i = 0; i < 6; i++)
@@ -1741,74 +1854,81 @@ namespace Oxide.Plugins
 
             var innerContainer = new ExtendedCuiElementContainer();
             innerContainer.Add(new CuiElement { Name = "AI_PLAYER_BUFFS_DETAILS", Parent = "AI_PLAYER_BUFFS_DETAILS_SB", Components = { new CuiRawImageComponent { Color = "0.969 0.922 0.882 0.11", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0 1", AnchorMax = "1 1", OffsetMin = $"0 0", OffsetMax = $"0 0" } } });
-            
-            innerContainer.Add(new CuiElement { Name = $"HeaderEpicDescription", Parent = "AI_PLAYER_BUFFS_DETAILS", Components = { new CuiRawImageComponent { Color = "0.969 0.922 0.882 0.11", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0 1", AnchorMax = "1 1", OffsetMin = $"0 -{20 + offset}", OffsetMax = $"0 -{offset}" } } });
-            innerContainer.Add(new CuiLabel { Text = { Text = lang.GetMessage("UI_PLAYERBUFFS_EPIC", this, player.UserIDString), Font = "robotocondensed-bold.ttf", FontSize = 14, Align = TextAnchor.MiddleLeft, Color = "1 1 1 1" }, RectTransform = { AnchorMin = $"0 0", AnchorMax = $"1 1", OffsetMin = $"6 0", OffsetMax = $"-6 0" } }, $"HeaderEpicDescription", "HeaderEpicDescription_Text" );
-            
-            offset += 23;
 
-            if (epicBuffs.Count == 0 && permissions.Length == 0)
+            if (EpicLoot != null)
             {
-                innerContainer.Add(new CuiElement { Name = $"BonusDescriptionEpicNone", Parent = "AI_PLAYER_BUFFS_DETAILS", Components = { new CuiRawImageComponent { Color = "0.969 0.922 0.882 0.055", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0 1", AnchorMax = "1 1", OffsetMin = $"10 -{33 + offset}", OffsetMax = $"0 -{offset}" } } });
-                innerContainer.Add(new CuiLabel { Text = { Text = lang.GetMessage("UI_PLAYERBUFFS_NO_EPIC", this, player.UserIDString), Font = "robotocondensed-bold.ttf", FontSize = 12, Align = TextAnchor.MiddleCenter, Color = "1 1 1 0.3" }, RectTransform = { AnchorMin = $"0 0", AnchorMax = $"1 1", OffsetMin = $"3 0", OffsetMax = $"-3 0" } }, $"BonusDescriptionEpicNone", $"BonusDescriptionEpicNone_Text" );
+                innerContainer.Add(new CuiElement { Name = $"HeaderEpicDescription", Parent = "AI_PLAYER_BUFFS_DETAILS", Components = { new CuiRawImageComponent { Color = "0.969 0.922 0.882 0.11", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0 1", AnchorMax = "1 1", OffsetMin = $"0 -{20 + offset}", OffsetMax = $"0 -{offset}" } } });
+                innerContainer.Add(new CuiLabel { Text = { Text = lang.GetMessage("UI_PLAYERBUFFS_EPIC", this, player.UserIDString), Font = "robotocondensed-bold.ttf", FontSize = 14, Align = TextAnchor.MiddleLeft, Color = "1 1 1 1" }, RectTransform = { AnchorMin = $"0 0", AnchorMax = $"1 1", OffsetMin = $"6 0", OffsetMax = $"-6 0" } }, $"HeaderEpicDescription", "HeaderEpicDescription_Text" );
+            
+                offset += 23;
 
-                offset += 34;
-            }
+                if (epicBuffs.Count == 0 && permissions.Length == 0)
+                {
+                    innerContainer.Add(new CuiElement { Name = $"BonusDescriptionEpicNone", Parent = "AI_PLAYER_BUFFS_DETAILS", Components = { new CuiRawImageComponent { Color = "0.969 0.922 0.882 0.055", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0 1", AnchorMax = "1 1", OffsetMin = $"10 -{33 + offset}", OffsetMax = $"0 -{offset}" } } });
+                    innerContainer.Add(new CuiLabel { Text = { Text = lang.GetMessage("UI_PLAYERBUFFS_NO_EPIC", this, player.UserIDString), Font = "robotocondensed-bold.ttf", FontSize = 12, Align = TextAnchor.MiddleCenter, Color = "1 1 1 0.3" }, RectTransform = { AnchorMin = $"0 0", AnchorMax = $"1 1", OffsetMin = $"3 0", OffsetMax = $"-3 0" } }, $"BonusDescriptionEpicNone", $"BonusDescriptionEpicNone_Text" );
 
-            foreach (var epic in epicBuffs.OrderBy(p => p.Key.ToString()))
-            {
-                var col = GetColorFromHtml("#077E93");
+                    offset += 34;
+                }
+
+                foreach (var epic in epicBuffs.OrderBy(p => p.Key.ToString()))
+                {
+                    var col = GetColorFromHtml("#077E93");
                 
-                innerContainer.Add(new CuiElement { Name = $"BonusDescription{epic.Key.ToString()}", Parent = "AI_PLAYER_BUFFS_DETAILS", Components = { new CuiRawImageComponent { Color = "0.969 0.922 0.882 0.055", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0 1", AnchorMax = "0.3 1", OffsetMin = $"10 -{33 + offset}", OffsetMax = $"0 -{offset}" } } });
-                innerContainer.Add(new CuiLabel { Text = { Text = lang.GetMessage(epic.Key.ToString(), EpicLoot, player.UserIDString), Font = "robotocondensed-bold.ttf", FontSize = 12, Align = TextAnchor.MiddleLeft, Color = $"{col.r} {col.g} {col.b} {col.a}" }, RectTransform = { AnchorMin = $"0 0", AnchorMax = $"1 1", OffsetMin = $"3 0", OffsetMax = $"-3 0" } }, $"BonusDescription{epic.Key.ToString()}", $"BonusDescription_Text{epic.Key.ToString()}" );
+                    innerContainer.Add(new CuiElement { Name = $"BonusDescription{epic.Key.ToString()}", Parent = "AI_PLAYER_BUFFS_DETAILS", Components = { new CuiRawImageComponent { Color = "0.969 0.922 0.882 0.055", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0 1", AnchorMax = "0.3 1", OffsetMin = $"10 -{33 + offset}", OffsetMax = $"0 -{offset}" } } });
+                    innerContainer.Add(new CuiLabel { Text = { Text = lang.GetMessage(epic.Key.ToString(), EpicLoot, player.UserIDString), Font = "robotocondensed-bold.ttf", FontSize = 12, Align = TextAnchor.MiddleLeft, Color = $"{col.r} {col.g} {col.b} {col.a}" }, RectTransform = { AnchorMin = $"0 0", AnchorMax = $"1 1", OffsetMin = $"3 0", OffsetMax = $"-3 0" } }, $"BonusDescription{epic.Key.ToString()}", $"BonusDescription_Text{epic.Key.ToString()}" );
 
-                innerContainer.Add(new CuiElement { Name = $"BonusDescription{epic.Key.ToString()}", Parent = "AI_PLAYER_BUFFS_DETAILS", Components = { new CuiRawImageComponent { Color = "0.969 0.922 0.882 0.055", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0.3 1", AnchorMax = "1 1", OffsetMin = $"0 -{33 + offset}", OffsetMax = $"-10 -{offset}" } } });
-                innerContainer.Add(new CuiLabel { Text = { Text = string.Format(GetSetBonusDescription(player, epic.Key), epic.Value * 100), Font = "robotocondensed-bold.ttf", FontSize = 12, Align = TextAnchor.MiddleLeft, Color = "1 1 1 1" }, RectTransform = { AnchorMin = $"0 0", AnchorMax = $"1 1", OffsetMin = $"3 0", OffsetMax = $"-3 0" } }, $"BonusDescription{epic.Key.ToString()}", $"BonusDescription_Text{epic.Key.ToString()}" );
+                    innerContainer.Add(new CuiElement { Name = $"BonusDescription{epic.Key.ToString()}", Parent = "AI_PLAYER_BUFFS_DETAILS", Components = { new CuiRawImageComponent { Color = "0.969 0.922 0.882 0.055", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0.3 1", AnchorMax = "1 1", OffsetMin = $"0 -{33 + offset}", OffsetMax = $"-10 -{offset}" } } });
+                    innerContainer.Add(new CuiLabel { Text = { Text = string.Format(GetSetBonusDescription(player, epic.Key), epic.Value * 100), Font = "robotocondensed-bold.ttf", FontSize = 12, Align = TextAnchor.MiddleLeft, Color = "1 1 1 1" }, RectTransform = { AnchorMin = $"0 0", AnchorMax = $"1 1", OffsetMin = $"3 0", OffsetMax = $"-3 0" } }, $"BonusDescription{epic.Key.ToString()}", $"BonusDescription_Text{epic.Key.ToString()}" );
             
-                offset += 34;
-            }
+                    offset += 34;
+                }
 
-            if (permissions != "")
-            {                
-                innerContainer.Add(new CuiElement { Name = $"BonusDescriptionPermissions", Parent = "AI_PLAYER_BUFFS_DETAILS", Components = { new CuiRawImageComponent { Color = "0.969 0.922 0.882 0.055", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0 1", AnchorMax = "0.3 1", OffsetMin = $"10 -{33 + offset}", OffsetMax = $"0 -{offset}" } } });
-                innerContainer.Add(new CuiLabel { Text = { Text = lang.GetMessage("UI_EPICBUFFDESCRIPTION_SET_BONU_PERMISSION", this, player.UserIDString), Font = "robotocondensed-bold.ttf", FontSize = 12, Align = TextAnchor.MiddleLeft, Color = $"1 1 1 1" }, RectTransform = { AnchorMin = $"0 0", AnchorMax = $"1 1", OffsetMin = $"3 0", OffsetMax = $"-3 0" } }, $"BonusDescriptionPermissions", $"BonusDescriptionPermissions_Text" );
+                if (permissions != "")
+                {                
+                    innerContainer.Add(new CuiElement { Name = $"BonusDescriptionPermissions", Parent = "AI_PLAYER_BUFFS_DETAILS", Components = { new CuiRawImageComponent { Color = "0.969 0.922 0.882 0.055", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0 1", AnchorMax = "0.3 1", OffsetMin = $"10 -{33 + offset}", OffsetMax = $"0 -{offset}" } } });
+                    innerContainer.Add(new CuiLabel { Text = { Text = lang.GetMessage("UI_EPICBUFFDESCRIPTION_SET_BONU_PERMISSION", this, player.UserIDString), Font = "robotocondensed-bold.ttf", FontSize = 12, Align = TextAnchor.MiddleLeft, Color = $"1 1 1 1" }, RectTransform = { AnchorMin = $"0 0", AnchorMax = $"1 1", OffsetMin = $"3 0", OffsetMax = $"-3 0" } }, $"BonusDescriptionPermissions", $"BonusDescriptionPermissions_Text" );
                 
-                innerContainer.Add(new CuiElement { Name = $"BonusDescriptionPermissionsText", Parent = "AI_PLAYER_BUFFS_DETAILS", Components = { new CuiRawImageComponent { Color = "0.969 0.922 0.882 0.055", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0.3 1", AnchorMax = "1 1", OffsetMin = $"0 -{33 + offset}", OffsetMax = $"-10 -{offset}" } } });
-                innerContainer.Add(new CuiLabel { Text = { Text = permissions, Font = "robotocondensed-bold.ttf", FontSize = 12, Align = TextAnchor.MiddleLeft, Color = "1 1 1 1" }, RectTransform = { AnchorMin = $"0 0", AnchorMax = $"1 1", OffsetMin = $"3 0", OffsetMax = $"-3 0" } }, $"BonusDescriptionPermissionsText", $"BonusDescriptionPermissionsText_Text" );
+                    innerContainer.Add(new CuiElement { Name = $"BonusDescriptionPermissionsText", Parent = "AI_PLAYER_BUFFS_DETAILS", Components = { new CuiRawImageComponent { Color = "0.969 0.922 0.882 0.055", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0.3 1", AnchorMax = "1 1", OffsetMin = $"0 -{33 + offset}", OffsetMax = $"-10 -{offset}" } } });
+                    innerContainer.Add(new CuiLabel { Text = { Text = permissions, Font = "robotocondensed-bold.ttf", FontSize = 12, Align = TextAnchor.MiddleLeft, Color = "1 1 1 1" }, RectTransform = { AnchorMin = $"0 0", AnchorMax = $"1 1", OffsetMin = $"3 0", OffsetMax = $"-3 0" } }, $"BonusDescriptionPermissionsText", $"BonusDescriptionPermissionsText_Text" );
             
-                offset += 34;
+                    offset += 34;
+                }
+            
+                offset+= 8;
+
             }
             
-            offset+= 8;
-            
-            innerContainer.Add(new CuiElement { Name = $"HeaderPerkDescription", Parent = "AI_PLAYER_BUFFS_DETAILS", Components = { new CuiRawImageComponent { Color = "0.969 0.922 0.882 0.11", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0 1", AnchorMax = "1 1", OffsetMin = $"0 -{20 + offset}", OffsetMax = $"0 -{offset}" } } });
-            innerContainer.Add(new CuiLabel { Text = { Text = lang.GetMessage("UI_PLAYERBUFFS_PERKS", this, player.UserIDString), Font = "robotocondensed-bold.ttf", FontSize = 14, Align = TextAnchor.MiddleLeft, Color = "1 1 1 1" }, RectTransform = { AnchorMin = $"0 0", AnchorMax = $"1 1", OffsetMin = $"6 0", OffsetMax = $"-6 0" } }, $"HeaderPerkDescription", "HeaderPerkDescription_Text" );
-            
-            offset += 23;
-
-            if (playerState.activePerkBuffs.Count == 0)
+            if (ItemPerks != null)
             {
-                innerContainer.Add(new CuiElement { Name = $"BonusDescriptionPerkNone", Parent = "AI_PLAYER_BUFFS_DETAILS", Components = { new CuiRawImageComponent { Color = "0.969 0.922 0.882 0.055", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0 1", AnchorMax = "1 1", OffsetMin = $"10 -{33 + offset}", OffsetMax = $"0 -{offset}" } } });
-                innerContainer.Add(new CuiLabel { Text = { Text = lang.GetMessage("UI_PLAYERBUFFS_NO_PERK", this, player.UserIDString), Font = "robotocondensed-bold.ttf", FontSize = 12, Align = TextAnchor.MiddleCenter, Color = "1 1 1 0.3" }, RectTransform = { AnchorMin = $"0 0", AnchorMax = $"1 1", OffsetMin = $"3 0", OffsetMax = $"-3 0" } }, $"BonusDescriptionPerkNone", $"BonusDescriptionPerkNone_Text" );
-
-                offset += 34;
-            }
-
-            foreach (var perk in playerState.activePerkBuffs.OrderBy(p => p.Key.ToString()))
-            {
-                var col = GetColorFromHtml("#077E93");
-
-                innerContainer.Add(new CuiElement { Name = $"BonusDescription{perk.Key.ToString()}", Parent = "AI_PLAYER_BUFFS_DETAILS", Components = { new CuiRawImageComponent { Color = "0.969 0.922 0.882 0.055", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0 1", AnchorMax = "0.3 1", OffsetMin = $"10 -{23 + offset}", OffsetMax = $"0 -{offset}" } } });
-                innerContainer.Add(new CuiLabel { Text = { Text = lang.GetMessage("UI" + perk.Key.ToString(), ItemPerks, player.UserIDString), Font = "robotocondensed-bold.ttf", FontSize = 12, Align = TextAnchor.MiddleLeft, Color = $"{col.r} {col.g} {col.b} {col.a}" }, RectTransform = { AnchorMin = $"0 0", AnchorMax = $"1 1", OffsetMin = $"3 0", OffsetMax = $"-3 0" } }, $"BonusDescription{perk.Key.ToString()}", $"BonusDescription_Text{perk.Key.ToString()}" );
-
-                innerContainer.Add(new CuiElement { Name = $"BonusDescription{perk.Key.ToString()}", Parent = "AI_PLAYER_BUFFS_DETAILS", Components = { new CuiRawImageComponent { Color = "0.969 0.922 0.882 0.055", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0.3 1", AnchorMax = "1 1", OffsetMin = $"0 -{23 + offset}", OffsetMax = $"-50 -{offset}" } } });
-                innerContainer.Add(new CuiLabel { Text = { Text = $"{GetPerkValue(perk.Value, perk.Key)}{GetPerkTypeString(perk.Key)}", Font = "robotocondensed-bold.ttf", FontSize = 12, Align = TextAnchor.MiddleLeft, Color = "1 1 1 1" }, RectTransform = { AnchorMin = $"0 0", AnchorMax = $"1 1", OffsetMin = $"3 0", OffsetMax = $"-3 0" } }, $"BonusDescription{perk.Key.ToString()}", $"BonusDescription_Text{perk.Key.ToString()}" );
+                innerContainer.Add(new CuiElement { Name = $"HeaderPerkDescription", Parent = "AI_PLAYER_BUFFS_DETAILS", Components = { new CuiRawImageComponent { Color = "0.969 0.922 0.882 0.11", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0 1", AnchorMax = "1 1", OffsetMin = $"0 -{20 + offset}", OffsetMax = $"0 -{offset}" } } });
+                innerContainer.Add(new CuiLabel { Text = { Text = lang.GetMessage("UI_PLAYERBUFFS_PERKS", this, player.UserIDString), Font = "robotocondensed-bold.ttf", FontSize = 14, Align = TextAnchor.MiddleLeft, Color = "1 1 1 1" }, RectTransform = { AnchorMin = $"0 0", AnchorMax = $"1 1", OffsetMin = $"6 0", OffsetMax = $"-6 0" } }, $"HeaderPerkDescription", "HeaderPerkDescription_Text" );
             
-                innerContainer.Add(new CuiElement { Name = $"BonusDescriptionBtn{perk.Key.ToString()}", Parent = "AI_PLAYER_BUFFS_DETAILS", Components = { new CuiRawImageComponent { Color = "0.969 0.922 0.882 0.055", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "1 1", AnchorMax = "1 1", OffsetMin = $"-50 -{23 + offset}", OffsetMax = $"-10 -{offset}" } } });
-                innerContainer.Add(new CuiPanel { Image = { Color = "1 1 1 1", Sprite = "assets/icons/info.png" }, RectTransform = { AnchorMin = "0 0.5", AnchorMax = "0 0.5", OffsetMin = $"8 -8", OffsetMax = $"24 8" } }, $"BonusDescriptionBtn{perk.Key.ToString()}", $"BonusDescriptionBtn{perk.Key.ToString()}_ICON");
-                innerContainer.Add(new CuiButton { Button = { Color = "0 0 0 0", Command = $"cmdshowperkinfopanel {perk.Key.ToString()}" }, RectTransform = { AnchorMin = "0 0", AnchorMax = "1 1", OffsetMin = "0 0", OffsetMax = "0 0" } }, $"BonusDescriptionBtn{perk.Key.ToString()}", $"BonusDescriptionBtn{perk.Key.ToString()}_BTN");
+                offset += 23;
 
-                offset += 24;
+                if (playerState.activePerkBuffs.Count == 0)
+                {
+                    innerContainer.Add(new CuiElement { Name = $"BonusDescriptionPerkNone", Parent = "AI_PLAYER_BUFFS_DETAILS", Components = { new CuiRawImageComponent { Color = "0.969 0.922 0.882 0.055", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0 1", AnchorMax = "1 1", OffsetMin = $"10 -{33 + offset}", OffsetMax = $"0 -{offset}" } } });
+                    innerContainer.Add(new CuiLabel { Text = { Text = lang.GetMessage("UI_PLAYERBUFFS_NO_PERK", this, player.UserIDString), Font = "robotocondensed-bold.ttf", FontSize = 12, Align = TextAnchor.MiddleCenter, Color = "1 1 1 0.3" }, RectTransform = { AnchorMin = $"0 0", AnchorMax = $"1 1", OffsetMin = $"3 0", OffsetMax = $"-3 0" } }, $"BonusDescriptionPerkNone", $"BonusDescriptionPerkNone_Text" );
+
+                    offset += 34;
+                }
+
+                foreach (var perk in playerState.activePerkBuffs.OrderBy(p => p.Key.ToString()))
+                {
+                    var col = GetColorFromHtml("#077E93");
+
+                    innerContainer.Add(new CuiElement { Name = $"BonusDescription{perk.Key.ToString()}", Parent = "AI_PLAYER_BUFFS_DETAILS", Components = { new CuiRawImageComponent { Color = "0.969 0.922 0.882 0.055", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0 1", AnchorMax = "0.3 1", OffsetMin = $"10 -{23 + offset}", OffsetMax = $"0 -{offset}" } } });
+                    innerContainer.Add(new CuiLabel { Text = { Text = lang.GetMessage("UI" + perk.Key.ToString(), ItemPerks, player.UserIDString), Font = "robotocondensed-bold.ttf", FontSize = 12, Align = TextAnchor.MiddleLeft, Color = $"{col.r} {col.g} {col.b} {col.a}" }, RectTransform = { AnchorMin = $"0 0", AnchorMax = $"1 1", OffsetMin = $"3 0", OffsetMax = $"-3 0" } }, $"BonusDescription{perk.Key.ToString()}", $"BonusDescription_Text{perk.Key.ToString()}" );
+
+                    innerContainer.Add(new CuiElement { Name = $"BonusDescription{perk.Key.ToString()}", Parent = "AI_PLAYER_BUFFS_DETAILS", Components = { new CuiRawImageComponent { Color = "0.969 0.922 0.882 0.055", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0.3 1", AnchorMax = "1 1", OffsetMin = $"0 -{23 + offset}", OffsetMax = $"-50 -{offset}" } } });
+                    innerContainer.Add(new CuiLabel { Text = { Text = $"{GetPerkValue(perk.Value, perk.Key)}{GetPerkTypeString(perk.Key)}", Font = "robotocondensed-bold.ttf", FontSize = 12, Align = TextAnchor.MiddleLeft, Color = "1 1 1 1" }, RectTransform = { AnchorMin = $"0 0", AnchorMax = $"1 1", OffsetMin = $"3 0", OffsetMax = $"-3 0" } }, $"BonusDescription{perk.Key.ToString()}", $"BonusDescription_Text{perk.Key.ToString()}" );
+            
+                    innerContainer.Add(new CuiElement { Name = $"BonusDescriptionBtn{perk.Key.ToString()}", Parent = "AI_PLAYER_BUFFS_DETAILS", Components = { new CuiRawImageComponent { Color = "0.969 0.922 0.882 0.055", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "1 1", AnchorMax = "1 1", OffsetMin = $"-50 -{23 + offset}", OffsetMax = $"-10 -{offset}" } } });
+                    innerContainer.Add(new CuiPanel { Image = { Color = "1 1 1 1", Sprite = "assets/icons/info.png" }, RectTransform = { AnchorMin = "0 0.5", AnchorMax = "0 0.5", OffsetMin = $"8 -8", OffsetMax = $"24 8" } }, $"BonusDescriptionBtn{perk.Key.ToString()}", $"BonusDescriptionBtn{perk.Key.ToString()}_ICON");
+                    innerContainer.Add(new CuiButton { Button = { Color = "0 0 0 0", Command = $"cmdshowperkinfopanel {perk.Key.ToString()}" }, RectTransform = { AnchorMin = "0 0", AnchorMax = "1 1", OffsetMin = "0 0", OffsetMax = "0 0" } }, $"BonusDescriptionBtn{perk.Key.ToString()}", $"BonusDescriptionBtn{perk.Key.ToString()}_BTN");
+
+                    offset += 24;
+                }
             }
 
             // scroll panel container
@@ -1856,7 +1976,7 @@ namespace Oxide.Plugins
             builder.Add(new CuiElement { Name = "AI_ITEM_INFO_HEADER", Parent = "AI_ITEM_INFO", Components = { new CuiRawImageComponent { Color = "0.969 0.922 0.882 0.055", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0 1", AnchorMax = "1 1", OffsetMin = $"0 -22", OffsetMax = $"0 -2" } } });
             builder.Add(new CuiLabel { Text = { Text = lang.GetMessage( "UI_ITEM_DETAILS_DESCRIPTION", this, player.UserIDString), Font = "robotocondensed-bold.ttf", FontSize = 12, Align = TextAnchor.MiddleLeft, Color = "1 1 1 1" }, RectTransform = { AnchorMin = "0 0", AnchorMax = "1 1", OffsetMin = $"5 0", OffsetMax = $"-5 0" } }, "AI_ITEM_INFO_HEADER", "AI_ITEM_INFO_HEADER_TEXT");
             
-            if (item.perks.Count > 0)
+            if (item.perks.Count > 0 && ItemPerks != null)
             {
                 if (item.named)
                 {
@@ -2175,13 +2295,8 @@ namespace Oxide.Plugins
                 PerkSettings perkMods;
                 if (!perkConfig.enhancementSettings.perk_settings.TryGetValue(perk.Perk, out perkMods)) continue;
 
-                // max possible value for the perk
-                var perkMax = perkMods.max_mod * 100f;
                 // to find perk slider value we have to respect min and max mod values
                 var perkSlider = (perk.Value - perkMods.min_mod) / (perkMods.max_mod - perkMods.min_mod);
-                // actual value
-                // FIXME: retrieve perk values for REGENERATION + suff
-                var perkValue = Math.Round(perk.Value * 100, 2);
 
                 builder.Add(new CuiLabel { Text = { Text = lang.GetMessage("UI" + perk.Perk.ToString(), ItemPerks, player.UserIDString), Font = "robotocondensed-bold.ttf", FontSize = 12, Align = TextAnchor.MiddleRight, Color = "1 1 1 1" }, RectTransform = { AnchorMin = "0 1", AnchorMax = "0.3 1", OffsetMin = $"3 -{offset + 15 + count * 17}", OffsetMax = $"-3 -{offset + count * 17}" } }, panel, "AI_ITEM_PERK" );
                 builder.Add(new CuiElement { Name = "AI_ITEM_PERK_SLIDER", Parent = panel, Components = { new CuiRawImageComponent { Color = "0.969 0.922 0.882 0.055", Sprite = "assets/content/ui/ui.background.tiletex.psd"}, new CuiRectTransformComponent { AnchorMin = "0.3 1", AnchorMax = "0.9 1", OffsetMin = $"3 -{offset + 15 + count * 17}", OffsetMax = $"3 -{offset + count * 17}" } } });
@@ -2203,10 +2318,6 @@ namespace Oxide.Plugins
             {
                 PerkSettings perkMods;
                 if (!perkConfig.enhancementSettings.perk_settings.TryGetValue(perk.Perk, out perkMods)) continue;
-
-                // actual value
-                // FIXME: retrieve perk values for REGENERATION + suff
-                var perkValue = Math.Round(perk.Value * 100, 2);
 
                 builder.Add(new CuiLabel { Text = { Text = lang.GetMessage("UI" + perk.Perk.ToString(), ItemPerks, player.UserIDString), Font = "robotocondensed-bold.ttf", FontSize = 12, Align = TextAnchor.MiddleRight, Color = "1 1 1 1" }, RectTransform = { AnchorMin = "0 1", AnchorMax = "0.3 1", OffsetMin = $"3 -{offset + 15 + count * 17}", OffsetMax = $"-3 -{offset + count * 17}" } }, panel, "AI_ITEM_PERK" );
                 builder.Add(new CuiElement { Name = "AI_ITEM_PERK_VALUE", Parent = panel, Components = { new CuiTextComponent { Text = $"{GetPerkValue(perk.Value, perk.Perk)}{GetPerkTypeString(perk.Perk)}", Font = "robotocondensed-bold.ttf", FontSize = 12, Align = TextAnchor.MiddleRight, Color = "1 1 1 1" }, new CuiOutlineComponent { Color = "0 0 0 0.5", Distance = "1 -1" }, new CuiRectTransformComponent { AnchorMin = "0.3 1", AnchorMax = "0.9 1", OffsetMin = $"0 -{offset + 15 + count * 17}", OffsetMax = $"3 -{offset + count * 17}" } } });
@@ -2320,7 +2431,7 @@ namespace Oxide.Plugins
             // footer
             builder.Add(new CuiPanel { Image = { Color = "0.969 0.922 0.882 0.11" }, RectTransform = { AnchorMin = "0.5 0.5", AnchorMax = "0.5 0.5", OffsetMin = $"-200 -{height-2}", OffsetMax = $"200 -{height-32}" } }, "SELECT_PERK_BUFFS_BACKDROP", "ActionsPanel");
             builder.Add(new CuiButton { Button = { Color = hasPayment && (isWeighted || selectedKits.Count == maxKits) && (!requiresKit || selectedKits.Count > 0) ? "0.45098 0.55294 0.27059 1" : "0.3 0.3 0.3 1", Command = hasPayment && (isWeighted || selectedKits.Count == maxKits) && (!requiresKit || selectedKits.Count > 0) ? $"{action} {itemToMod.uid.ToString()} {CLI.Serialize(selectedKits)}" : " " }, Text = { Text = lang.GetMessage("UI_PERKBUFFSELECTION_CONFIRM", this, player.UserIDString), Font = "robotocondensed-regular.ttf", FontSize = 16, Align = TextAnchor.MiddleCenter, Color = "1 1 1 1" }, RectTransform = { AnchorMin = "0 0", AnchorMax = "0.5 1", OffsetMin = "10 5", OffsetMax = "-10 -5" } }, "ActionsPanel", "ConfirmButton", "ConfirmButton");
-            builder.Add(new CuiButton { Button = { Color = "0.77255 0.23922 0.15686 1", Command = $"cmdcloseselectperkbuffs" }, Text = { Text = lang.GetMessage("UI_PERKBUFFSELECTION_CANCEL", this, player.UserIDString), Font = "robotocondensed-regular.ttf", FontSize = 16, Align = TextAnchor.MiddleCenter, Color = "1 1 1 1" }, RectTransform = { AnchorMin = "0.5 0", AnchorMax = "1 1", OffsetMin = "10 5", OffsetMax = "-10 -5" } }, "ActionsPanel", "CloseButton");
+            builder.Add(new CuiButton { Button = { Color = "0.77255 0.23922 0.15686 1", Command = $"cmdcloseselectperkbuffs {itemToMod.uid.ToString()}" }, Text = { Text = lang.GetMessage("UI_PERKBUFFSELECTION_CANCEL", this, player.UserIDString), Font = "robotocondensed-regular.ttf", FontSize = 16, Align = TextAnchor.MiddleCenter, Color = "1 1 1 1" }, RectTransform = { AnchorMin = "0.5 0", AnchorMax = "1 1", OffsetMin = "10 5", OffsetMax = "-10 -5" } }, "ActionsPanel", "CloseButton");
         }
 
         public void AddPerkChances(ExtendedCuiElementContainer builder, BasePlayer player, string action, BaseItem itemToMod, List<Perk> selectedKits)
@@ -2488,6 +2599,7 @@ namespace Oxide.Plugins
 
         static string BACKDROP_PANEL = "AI_BACKDROP_PANEL";
         static string CLOSE_BUTTON = "closebutton";
+        static string SETTINGS_BUTTON = "settingsbutton";
 
         static string AI_INFO_BOX = "AI_INFO_BOX";
         
@@ -2579,7 +2691,7 @@ namespace Oxide.Plugins
                 }, Parent, Name, Name);
 
                 // background for epic items
-                if (Item.buff != null)
+                if (Item.buff != null && Instance.EpicLoot != null)
                 {
                     var col = GetColorFromHtml(Instance.epicConfig.tier_information.tier_colours[Item.buff.Tier]);
                     var offset = imageOffset * 1.5f;
@@ -2610,7 +2722,7 @@ namespace Oxide.Plugins
                     RectTransform = { AnchorMin = "0 0", AnchorMax = "1 1", OffsetMin = $"{imageOffset} {imageOffset * 1.5}", OffsetMax = $"{-imageOffset} {-imageOffset * 0.5}" }
                 }, Name, "Icon");
 
-                if (Item.perks.Count > 0)
+                if (Item.perks.Count > 0 && Instance.ItemPerks != null)
                 {
                     Add(new CuiElement
                     {
@@ -3235,6 +3347,9 @@ namespace Oxide.Plugins
             {
                 ["UICLOSE"] = "CLOSE",
                 ["UI_OK"] = "OK",
+                
+                ["UI_SETTINGS_HEADER"] = "Change Settings",
+                ["UI_SETTINGS_TOGGLE_MAIN_BUTTON"] = "Enable Main Button",
 
                 ["RANDOM"] = "Random",
                 ["CAN_FAIL"] = "<color=#FF0000>This process can fail!</color>",

@@ -175,6 +175,7 @@ You can then give perk.kit2 permission when the player reaches level 20 with ski
 | epic.salvage				| the player can salvage epic items from menu		|
 | epic.enhance				| the player can add epic buffs to items			|
 | free						| the player can modify all items for free			|
+| settings.hide_button		| the player can hide the main button				|
 
 ## Configurations
 The plugin is reading configurations from Epic Loot and Item Perk when starting.
@@ -190,16 +191,14 @@ Because of the advanced crafting options for perks, this plugin will have its ow
 
 You can add default additional costs for each craft type.
 Simply set the values for "Item to use when ... a perk".
-The default costs is set to use epic scrap.
-
-*If your server is not supporting epic, you should change that.*
+The default costs is set to use scrap.
 
 Additional costs can be increased for each kit used during crafting process depending on the perk of the kit.
 
 ### Named Items
 Named items can be restricted and unrestricted.
 If restricted, the player cant reveal additional perks.
-For unrestricted items, the player can unveil additional perks, if the total amount of perks is not exceeding the max allowed number.
+The player can unveil additional perks for unrestricted items, if the total amount of perks is not exceeding the max allowed number.
 Additional costs can be defined according to other perk crafting actions.
 
 The player will not be able to improve chances with kits.
