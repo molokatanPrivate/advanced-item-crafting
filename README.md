@@ -175,7 +175,7 @@ You can then give perk.kit2 permission when the player reaches level 20 with ski
 | epic.salvage				| the player can salvage epic items from menu		|
 | epic.enhance				| the player can add epic buffs to items			|
 | free						| the player can modify all items for free			|
-| settings.hide_button		| the player can hide the main button				|
+| settings.hide_button		| reserved for settings menu				        |
 
 ## Configurations
 The plugin is reading configurations from Epic Loot and Item Perk when starting.
@@ -203,6 +203,8 @@ Additional costs can be defined according to other perk crafting actions.
 
 The player will not be able to improve chances with kits.
 Kits are disabled and rolls rely fully on perk weights.
+
+A minimum weight can be set to improve chances for rare mods while unveiling.
 
 ## Translations
 You will find out when looking into the language file, that this plugin barely uses translations.
