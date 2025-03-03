@@ -36,7 +36,7 @@ using UnityEngine;
  **/
 namespace Oxide.Plugins
 {
-    [Info("AdvancedItemCrafting", "molokatan", "1.0.1"), Description("User Interface and advanced crafting options for Item Perks and Epic Loot")]
+    [Info("AdvancedItemCrafting", "molokatan", "1.0.2"), Description("User Interface and advanced crafting options for Item Perks and Epic Loot")]
     class AdvancedItemCrafting : RustPlugin
     {
         [PluginReference]
@@ -74,9 +74,9 @@ namespace Oxide.Plugins
         {
             Instance = this;
 
-            if (config.customButton.enabled && !string.IsNullOrEmpty(config.customButton.Icon))
+            if (config.user_experience.main_button.Enabled && !string.IsNullOrEmpty(config.user_experience.main_button.Icon))
             {
-                if (config.customButton.Icon.StartsWith("http"))
+                if (config.user_experience.main_button.Icon.StartsWith("http"))
                 {
                     if (ImageLibrary == null || !ImageLibrary.IsLoaded)
                     {
@@ -86,10 +86,10 @@ namespace Oxide.Plugins
                     }
                     else
                     {
-                        ImageLibrary?.Call("AddImage", config.customButton.Icon, "ai_btn_img");
+                        ImageLibrary?.Call("AddImage", config.user_experience.main_button.Icon, "ai_btn_img");
                     }
                 }
-                btn_icon = config.customButton.Icon;
+                btn_icon = config.user_experience.main_button.Icon;
             }
 
             if (EpicLoot == null || !EpicLoot.IsLoaded)
@@ -113,7 +113,7 @@ namespace Oxide.Plugins
             }
             RegisterPermissions();
 
-            if (BasePlayer.activePlayerList != null && config.customButton.enabled)
+            if (BasePlayer.activePlayerList != null && config.user_experience.main_button.Enabled)
             {
                 foreach (var player in BasePlayer.activePlayerList)
                     CreateMainButton(player);
@@ -657,7 +657,7 @@ namespace Oxide.Plugins
         {
             BaseItem baseItem = new BaseItem(itemToMod);
 
-            if (!CanReceivePerkBuff(baseItem)) return false;
+            if (!CanUnveilPerkBuff(baseItem)) return false;
 
             CraftItem craftItem = config.craft_settings.unveil_perk_settings.craft_item;
             int additionalCost = GetCraftItemAmountRequired(craftItem);
@@ -1663,10 +1663,17 @@ namespace Oxide.Plugins
                 }).ToDictionary(el => el.Key, el => el.Value);
         }
 
+        public bool CanUnveilPerkBuff(BaseItem item)
+        {
+            if (item.perks.Count >= config.craft_settings.add_perk_settings.maxPossiblePerks) return false;
+            
+            return GetEnabledPerkSettings().Count > 0;
+        }
+
         Dictionary<Perk, PerkSettings> GetEnabledPerkSettings()
         {
             return perkConfig.enhancementSettings.perk_settings
-                .Where(setting => setting.Value).ToDictionary(el => el.Key, el => el.Value);
+                .Where(setting => setting.Value.enabled).ToDictionary(el => el.Key, el => el.Value);
         }
 
         // FIXME: maybe write own translations, so we can have our own format
@@ -1724,21 +1731,22 @@ namespace Oxide.Plugins
         #region UIBuilder
         public void CreateMainButton(BasePlayer player)
         {
-            if (!config.customButton.enabled || permission.UserHasPermission(player.UserIDString, perm_settings_hide_button))
+            if (!config.user_experience.main_button.Enabled || permission.UserHasPermission(player.UserIDString, perm_settings_hide_button))
             {
                 CuiHelper.DestroyUi(player, MAIN_BUTTON);
                 return;
             }
 
             ExtendedCuiElementContainer builder = new ExtendedCuiElementContainer();
-            builder.Add(new CuiPanel { Image = { Color = config.customButton.BackgroundColor }, RectTransform = { AnchorMin = config.customButton.AnchorMin, AnchorMax = config.customButton.AnchorMax, OffsetMin = config.customButton.OffsetMin, OffsetMax = config.customButton.OffsetMax } }, config.customButton.Parent, MAIN_BUTTON);
+            var mainBtnCfg = config.user_experience.main_button;
+            builder.Add(new CuiPanel { Image = { Color = mainBtnCfg.BackgroundColor }, RectTransform = { AnchorMin = mainBtnCfg.Position.AnchorMin, AnchorMax = mainBtnCfg.Position.AnchorMax, OffsetMin = mainBtnCfg.Position.OffsetMin, OffsetMax = mainBtnCfg.Position.OffsetMax } }, mainBtnCfg.Parent, MAIN_BUTTON);
             
             if (btn_icon.IsNumeric())
-                builder.Add(new CuiElement { Name = $"{MAIN_BUTTON}_Img", Parent = MAIN_BUTTON, Components = { new CuiImageComponent { Color = "1 1 1 1", ItemId = 1776460938, SkinId = Convert.ToUInt64(btn_icon) }, new CuiRectTransformComponent { AnchorMin = "0 0", AnchorMax = "1 1", OffsetMin = $"0 0", OffsetMax = $"0 0" } } });
+                builder.Add(new CuiElement { Name = $"{MAIN_BUTTON}_Img", Parent = MAIN_BUTTON, Components = { new CuiImageComponent { Color = mainBtnCfg.IconColor, ItemId = 1776460938, SkinId = Convert.ToUInt64(btn_icon) }, new CuiRectTransformComponent { AnchorMin = mainBtnCfg.IconPosition.AnchorMin, AnchorMax = mainBtnCfg.IconPosition.AnchorMax, OffsetMin = mainBtnCfg.IconPosition.OffsetMin, OffsetMax = mainBtnCfg.IconPosition.OffsetMax } } });
             else if (btn_icon.StartsWith("http"))
-                builder.Add(new CuiElement { Name = $"{MAIN_BUTTON}_Img", Parent = MAIN_BUTTON, Components = { new CuiRawImageComponent { Color = "1 1 1 1", Png = (string)ImageLibrary?.Call("GetImage", "ai_btn_img") }, new CuiRectTransformComponent { AnchorMin = "0 0", AnchorMax = "1 1", OffsetMin = $"0 0", OffsetMax = $"0 0" } } });
+                builder.Add(new CuiElement { Name = $"{MAIN_BUTTON}_Img", Parent = MAIN_BUTTON, Components = { new CuiRawImageComponent { Color = mainBtnCfg.IconColor, Png = (string)ImageLibrary?.Call("GetImage", "ai_btn_img") }, new CuiRectTransformComponent { AnchorMin = mainBtnCfg.IconPosition.AnchorMin, AnchorMax = mainBtnCfg.IconPosition.AnchorMax, OffsetMin = mainBtnCfg.IconPosition.OffsetMin, OffsetMax = mainBtnCfg.IconPosition.OffsetMax } } });
             else
-                builder.Add(new CuiElement { Name = $"{MAIN_BUTTON}_Img", Parent = MAIN_BUTTON, Components = { new CuiImageComponent { Color = "1 1 1 1", Sprite = btn_icon }, new CuiRectTransformComponent { AnchorMin = "0 0", AnchorMax = "1 1", OffsetMin = "2 2", OffsetMax = "-2 -2" } } });
+                builder.Add(new CuiElement { Name = $"{MAIN_BUTTON}_Img", Parent = MAIN_BUTTON, Components = { new CuiImageComponent { Color = mainBtnCfg.IconColor, Sprite = btn_icon }, new CuiRectTransformComponent { AnchorMin = mainBtnCfg.IconPosition.AnchorMin, AnchorMax = mainBtnCfg.IconPosition.AnchorMax, OffsetMin = mainBtnCfg.IconPosition.OffsetMin, OffsetMax = mainBtnCfg.IconPosition.OffsetMax } } });
 
             builder.Add(new CuiButton { Button = { Color = "0 0 0 0", Command = "cmdopeninventory" }, Text = { Text = "" }, RectTransform = { AnchorMin = "0 0", AnchorMax = "1 1", OffsetMin = "0 0", OffsetMax = "0 0" } }, MAIN_BUTTON, $"{MAIN_BUTTON}_Btn");
             
@@ -1778,17 +1786,28 @@ namespace Oxide.Plugins
             builder.Add(new CuiPanel { Image = { Color = "0 0 0 0.95", Material = "assets/content/ui/uibackgroundblur-ingamemenu.mat" }, RectTransform = { AnchorMin = "0 0", AnchorMax = "1 1", OffsetMin = "-0.351 -0.332", OffsetMax = "0.349 0.338" }, CursorEnabled = true, KeyboardEnabled = true }, "Overlay", BACKDROP_PANEL, BACKDROP_PANEL);
             
             // close button
-            builder.Add(new CuiPanel { Image = { Color = "0.969 0.922 0.882 0.11" }, RectTransform = { AnchorMin = "0.5 0", AnchorMax = "0.5 0", OffsetMin = "-383 76", OffsetMax = "-213 112" } }, BACKDROP_PANEL, CLOSE_BUTTON);
-            builder.Add(new CuiButton { Button = { Color = "0.3 0.3 0.3 1", Command = CLOSE_COMMAND }, Text = { Text = lang.GetMessage("UICLOSE", this, player.UserIDString), Font = "robotocondensed-bold.ttf", FontSize = 20, Align = TextAnchor.MiddleCenter, Color = "1 1 1 1" }, RectTransform = { AnchorMin = "0 0", AnchorMax = "1 1", OffsetMin = "10 5", OffsetMax = "-10 -5" } }, CLOSE_BUTTON, $"{CLOSE_BUTTON}_Btn");
+            var closeBtnCfg = config.user_experience.close_button;
+            builder.Add(new CuiPanel { Image = { Color = closeBtnCfg.BackgroundColor }, RectTransform = { AnchorMin = closeBtnCfg.Position.AnchorMin, AnchorMax = closeBtnCfg.Position.AnchorMax, OffsetMin = closeBtnCfg.Position.OffsetMin, OffsetMax = closeBtnCfg.Position.OffsetMax } }, BACKDROP_PANEL, CLOSE_BUTTON);
+            builder.Add(new CuiPanel { Image = { Color = closeBtnCfg.IconColor, Sprite = closeBtnCfg.Icon }, RectTransform = { AnchorMin = closeBtnCfg.IconPosition.AnchorMin, AnchorMax = closeBtnCfg.IconPosition.AnchorMax, OffsetMin = closeBtnCfg.IconPosition.OffsetMin, OffsetMax = closeBtnCfg.IconPosition.OffsetMax } }, CLOSE_BUTTON, $"{CLOSE_BUTTON}_ICON");
+            builder.Add(new CuiButton { Button = { Color = "0 0 0 0", Command = CLOSE_COMMAND }, Text = { Text = "" }, RectTransform = { AnchorMin = closeBtnCfg.IconPosition.AnchorMin, AnchorMax = closeBtnCfg.IconPosition.AnchorMax, OffsetMin = closeBtnCfg.IconPosition.OffsetMin, OffsetMax = closeBtnCfg.IconPosition.OffsetMax } }, CLOSE_BUTTON, $"{CLOSE_BUTTON}_Btn");
 
-            if (config.customButton.enabled)
+            if (config.user_experience.main_button.Enabled)
             {
                 // settings button
-                builder.Add(new CuiPanel { Image = { Color = "0.969 0.922 0.882 0.11" }, RectTransform = { AnchorMin = "0.5 0", AnchorMax = "0.5 0", OffsetMin = "-422 76", OffsetMax = "-386 112" } }, BACKDROP_PANEL, SETTINGS_BUTTON);
-                builder.Add(new CuiPanel { Image = { Color = "1 1 1 1", Sprite = "assets/icons/gear.png" }, RectTransform = { AnchorMin = "0 0", AnchorMax = "1 1", OffsetMin = $"5 5", OffsetMax = $"-5 -5" } }, SETTINGS_BUTTON, $"{SETTINGS_BUTTON}_ICON");
-                builder.Add(new CuiButton { Button = { Color = "0 0 0 0", Command = "cmdopenaisettings" }, Text = { Text = "", Font = "robotocondensed-bold.ttf", FontSize = 20, Align = TextAnchor.MiddleCenter, Color = "1 1 1 1" }, RectTransform = { AnchorMin = "0 0", AnchorMax = "1 1", OffsetMin = "5 5", OffsetMax = "-5 -5" } }, SETTINGS_BUTTON, $"{SETTINGS_BUTTON}_Btn");
+                var settingsBtnCfg = config.user_experience.settings_button;
+                builder.Add(new CuiPanel { Image = { Color = settingsBtnCfg.BackgroundColor }, RectTransform = { AnchorMin = settingsBtnCfg.Position.AnchorMin, AnchorMax = settingsBtnCfg.Position.AnchorMax, OffsetMin = settingsBtnCfg.Position.OffsetMin, OffsetMax = settingsBtnCfg.Position.OffsetMax } }, BACKDROP_PANEL, SETTINGS_BUTTON);
+                builder.Add(new CuiPanel { Image = { Color = settingsBtnCfg.IconColor, Sprite = settingsBtnCfg.Icon }, RectTransform = { AnchorMin = settingsBtnCfg.IconPosition.AnchorMin, AnchorMax = settingsBtnCfg.IconPosition.AnchorMax, OffsetMin = settingsBtnCfg.IconPosition.OffsetMin, OffsetMax = settingsBtnCfg.IconPosition.OffsetMax } }, SETTINGS_BUTTON, $"{SETTINGS_BUTTON}_ICON");
+                builder.Add(new CuiButton { Button = { Color = "0 0 0 0", Command = "cmdopenaisettings" }, Text = { Text = "" }, RectTransform = { AnchorMin = settingsBtnCfg.IconPosition.AnchorMin, AnchorMax = settingsBtnCfg.IconPosition.AnchorMax, OffsetMin = settingsBtnCfg.IconPosition.OffsetMin, OffsetMax = settingsBtnCfg.IconPosition.OffsetMax } }, SETTINGS_BUTTON, $"{SETTINGS_BUTTON}_Btn");
             }
-            
+
+            // help button
+            /**
+            var helpBtnCfg = config.user_experience.help_button;
+            builder.Add(new CuiPanel { Image = { Color = helpBtnCfg.BackgroundColor }, RectTransform = { AnchorMin = helpBtnCfg.Position.AnchorMin, AnchorMax = helpBtnCfg.Position.AnchorMax, OffsetMin = helpBtnCfg.Position.OffsetMin, OffsetMax = helpBtnCfg.Position.OffsetMax } }, BACKDROP_PANEL, HELP_BUTTON);
+            builder.Add(new CuiPanel { Image = { Color = helpBtnCfg.IconColor, Sprite = helpBtnCfg.Icon }, RectTransform = { AnchorMin = helpBtnCfg.IconPosition.AnchorMin, AnchorMax = helpBtnCfg.IconPosition.AnchorMax, OffsetMin = helpBtnCfg.IconPosition.OffsetMin, OffsetMax = helpBtnCfg.IconPosition.OffsetMax } }, HELP_BUTTON, $"{HELP_BUTTON}_ICON");
+            builder.Add(new CuiButton { Button = { Color = "0 0 0 0", Command = "cmdopenaisettings" }, Text = { Text = "" }, RectTransform = { AnchorMin = helpBtnCfg.IconPosition.AnchorMin, AnchorMax = helpBtnCfg.IconPosition.AnchorMax, OffsetMin = helpBtnCfg.IconPosition.OffsetMin, OffsetMax = helpBtnCfg.IconPosition.OffsetMax } }, HELP_BUTTON, $"{HELP_BUTTON}_Btn");
+            **/
+
             // belt slots
             builder.Add(new CuiPanel { RectTransform = { AnchorMin = "0.5 0", AnchorMax = "0.5 0", OffsetMin = "-200 18", OffsetMax = "185 18" } }, BACKDROP_PANEL, BELT_PANEL);
             for (int i = 0; i < 6; i++)
@@ -2017,7 +2036,7 @@ namespace Oxide.Plugins
                 {
                     if (!item.restricted && config.craft_settings.unveil_perk_settings.enabled && permission.UserHasPermission(player.UserIDString, perm_named_unveil))
                     {
-                        if (CanReceivePerkBuff(item))
+                        if (CanUnveilPerkBuff(item))
                             builder.AddActionButton( lang.GetMessage( "UI_ITEM_DETAILS_UNVEIL_PERK_BUFF", this, player.UserIDString), offset, "assets/icons/examine.png", $"cmdselectperkbuffs {item.uid.Value} cmdunveilperk {CLI.Serialize(new List<Perk>())}", ITEM_ACTIONS_CONTAINER, "ADD_PERK");
                         offset += 33;
                     }
@@ -2615,6 +2634,7 @@ namespace Oxide.Plugins
         static string BACKDROP_PANEL = "AI_BACKDROP_PANEL";
         static string CLOSE_BUTTON = "closebutton";
         static string SETTINGS_BUTTON = "settingsbutton";
+        static string HELP_BUTTON = "helpbutton";
 
         static string AI_INFO_BOX = "AI_INFO_BOX";
         
@@ -2824,11 +2844,70 @@ namespace Oxide.Plugins
 
             [JsonProperty("Advanced Craft Settings")]
             public AdvancedCraftSettings craft_settings = new AdvancedCraftSettings();
-            
-            [JsonProperty("UI Custom Button")]
-            public CustomButton customButton = new CustomButton();
+
+            [JsonProperty("UX")]
+            public UX user_experience = new UX();
         }
 
+        public class UX
+        {
+            [JsonProperty("Main UI Button")]
+            public MainButton main_button = new MainButton { BackgroundColor = "0.969 0.922 0.882 0.15", Position = { AnchorMin = "0.5 0", AnchorMax = "0.5 0", OffsetMin = "-263 18", OffsetMax = "-204 78" }, Icon = "assets/icons/inventory.png", IconColor = "0.9 0.9 0.9 1" };
+
+            [JsonProperty("Close Button")]
+            public CustomButton close_button = new CustomButton { BackgroundColor = "0.969 0.922 0.882 0.11", Position = { AnchorMin = "0.5 0", AnchorMax = "0.5 0", OffsetMin = "-249 76", OffsetMax = "-213 112" }, Icon = "assets/icons/close.png", IconColor = "0.8 0.28 0.2 1", IconPosition = { AnchorMin = "0 0", AnchorMax = "1 1", OffsetMin = "5 5", OffsetMax = "-5 -5" } };
+
+            [JsonProperty("Settings Button")]
+            public CustomButton settings_button = new CustomButton { BackgroundColor = "0.969 0.922 0.882 0.11", Position = { AnchorMin = "0.5 0", AnchorMax = "0.5 0", OffsetMin = "-285 82", OffsetMax = "-255 112" }, Icon = "assets/icons/gear.png", IconPosition = { AnchorMin = "0 0", AnchorMax = "1 1", OffsetMin = "5 5", OffsetMax = "-5 -5" } };
+
+            [JsonProperty("Help Button")]
+            public CustomButton help_button = new CustomButton { BackgroundColor = "0.969 0.922 0.882 0.11", Position = { AnchorMin = "0.5 0", AnchorMax = "0.5 0", OffsetMin = "-317 82", OffsetMax = "-287 112" }, Icon = "assets/icons/info.png", IconPosition = { AnchorMin = "0 0", AnchorMax = "1 1", OffsetMin = "5 5", OffsetMax = "-5 -5" } };
+        }
+
+        public class CustomButton
+        {
+
+            [JsonProperty("Background Color")]
+            public string BackgroundColor = "0.969 0.922 0.882 0.15";
+            
+            [JsonProperty("Position of the Button")]
+            public CuiBox Position = new CuiBox();
+
+            [JsonProperty("Icon shown on the button")]
+            public string Icon = "assets/icons/gear.png";
+            
+            [JsonProperty("Icon Color")]
+            public string IconColor = "1 1 1 1";
+
+            [JsonProperty("Position of the Icon (relative to the Button)")]
+            public CuiBox IconPosition = new CuiBox();
+        }
+
+        public class MainButton : CustomButton
+        {
+            [JsonProperty("Should show a custom button to open inventory screen? (default = false)")]
+            public bool Enabled = false;
+
+            [JsonProperty("Should we show that button on the Hud or as an Overlay?")]
+            public string Parent = "Overlay";
+        }
+
+        public class CuiBox
+        {
+            [JsonProperty("Anchor Min")]
+            public string AnchorMin = "0 0";
+
+            [JsonProperty("Anchor Max")]
+            public string AnchorMax = "1 1";
+
+            [JsonProperty("Offset Min")]
+            public string OffsetMin = "0 0";
+
+            [JsonProperty("Offset Max")]
+            public string OffsetMax = "0 0";
+        }
+
+        /**
         public class CustomButton
         {
             [JsonProperty("Should show a custom button on the Hud? (default = false)")]
@@ -2854,7 +2933,7 @@ namespace Oxide.Plugins
 
             [JsonProperty("Offset Max")]
             public string OffsetMax = "-204 78";
-        }
+        }**/
 
         public class AdvancedCraftSettings
         {
