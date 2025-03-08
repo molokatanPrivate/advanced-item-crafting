@@ -846,8 +846,8 @@ namespace Oxide.Plugins
                 perkString += $"[{perk.Perk} {perk.Value}]";
             }
 
-            if (baseItem.buff == null)
-                itemToMod.name = $"{perkConfig.enhancementSettings.item_name_prefix} {itemToMod.info.displayName?.english}";
+            if (baseItem.buff == null && !string.IsNullOrEmpty(config.enhancementSettings.item_name_prefix))
+                itemToMod.name = $"{perkConfig.enhancementSettings.item_name_prefix} {(!string.IsNullOrEmpty(itemToMod.name) ? itemToMod.name : itemToMod.info.displayName?.english)}";
 
             itemToMod.text = perkString;
             itemToMod.MarkDirty();
@@ -2180,7 +2180,8 @@ namespace Oxide.Plugins
             var costItem = ItemManager.CreateByName(epicConfig.scrapper_settings.currency_shortname, cost, epicConfig.scrapper_settings.currency_skin);
 
             innerContainer.Add(new CuiElement { Name = $"SetCost", Parent = "AI_EPIC_BUFF_DESCRIPTION", Components = { new CuiRawImageComponent { Color = "0.969 0.922 0.882 0.055", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "1 1", AnchorMax = "1 1", OffsetMin = $"-58 -{48 + offset}", OffsetMax = $"-10 -{offset}" } } });
-            innerContainer.AddItemIconWithAmount(new BaseItem(costItem), 48f, "SetCost", "SetCost_Item");
+            if (costItem != null)
+                innerContainer.AddItemIconWithAmount(new BaseItem(costItem), 48f, "SetCost", "SetCost_Item");
 
             offset += 58;
 
