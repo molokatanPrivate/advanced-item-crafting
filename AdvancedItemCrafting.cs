@@ -846,7 +846,7 @@ namespace Oxide.Plugins
                 perkString += $"[{perk.Perk} {perk.Value}]";
             }
 
-            if (baseItem.buff == null && !string.IsNullOrEmpty(config.enhancementSettings.item_name_prefix))
+            if (baseItem.buff == null && !string.IsNullOrEmpty(perkConfig.enhancementSettings.item_name_prefix))
                 itemToMod.name = $"{perkConfig.enhancementSettings.item_name_prefix} {(!string.IsNullOrEmpty(itemToMod.name) ? itemToMod.name : itemToMod.info.displayName?.english)}";
 
             itemToMod.text = perkString;
@@ -1741,14 +1741,16 @@ namespace Oxide.Plugins
             var mainBtnCfg = config.user_experience.main_button;
             builder.Add(new CuiPanel { Image = { Color = mainBtnCfg.BackgroundColor }, RectTransform = { AnchorMin = mainBtnCfg.Position.AnchorMin, AnchorMax = mainBtnCfg.Position.AnchorMax, OffsetMin = mainBtnCfg.Position.OffsetMin, OffsetMax = mainBtnCfg.Position.OffsetMax } }, mainBtnCfg.Parent, MAIN_BUTTON);
             
-            if (btn_icon.IsNumeric())
-                builder.Add(new CuiElement { Name = $"{MAIN_BUTTON}_Img", Parent = MAIN_BUTTON, Components = { new CuiImageComponent { Color = mainBtnCfg.IconColor, ItemId = 1776460938, SkinId = Convert.ToUInt64(btn_icon) }, new CuiRectTransformComponent { AnchorMin = mainBtnCfg.IconPosition.AnchorMin, AnchorMax = mainBtnCfg.IconPosition.AnchorMax, OffsetMin = mainBtnCfg.IconPosition.OffsetMin, OffsetMax = mainBtnCfg.IconPosition.OffsetMax } } });
-            else if (btn_icon.StartsWith("http"))
-                builder.Add(new CuiElement { Name = $"{MAIN_BUTTON}_Img", Parent = MAIN_BUTTON, Components = { new CuiRawImageComponent { Color = mainBtnCfg.IconColor, Png = (string)ImageLibrary?.Call("GetImage", "ai_btn_img") }, new CuiRectTransformComponent { AnchorMin = mainBtnCfg.IconPosition.AnchorMin, AnchorMax = mainBtnCfg.IconPosition.AnchorMax, OffsetMin = mainBtnCfg.IconPosition.OffsetMin, OffsetMax = mainBtnCfg.IconPosition.OffsetMax } } });
-            else
-                builder.Add(new CuiElement { Name = $"{MAIN_BUTTON}_Img", Parent = MAIN_BUTTON, Components = { new CuiImageComponent { Color = mainBtnCfg.IconColor, Sprite = btn_icon }, new CuiRectTransformComponent { AnchorMin = mainBtnCfg.IconPosition.AnchorMin, AnchorMax = mainBtnCfg.IconPosition.AnchorMax, OffsetMin = mainBtnCfg.IconPosition.OffsetMin, OffsetMax = mainBtnCfg.IconPosition.OffsetMax } } });
-
-            builder.Add(new CuiButton { Button = { Color = "0 0 0 0", Command = "cmdopeninventory" }, Text = { Text = "" }, RectTransform = { AnchorMin = "0 0", AnchorMax = "1 1", OffsetMin = "0 0", OffsetMax = "0 0" } }, MAIN_BUTTON, $"{MAIN_BUTTON}_Btn");
+            if (!string.IsNullOrEmpty(mainBtnCfg.Icon))
+            {
+                if (btn_icon.IsNumeric())
+                    builder.Add(new CuiElement { Name = $"{MAIN_BUTTON}_Img", Parent = MAIN_BUTTON, Components = { new CuiImageComponent { Color = mainBtnCfg.IconColor, ItemId = 1776460938, SkinId = Convert.ToUInt64(btn_icon) }, new CuiRectTransformComponent { AnchorMin = mainBtnCfg.IconPosition.AnchorMin, AnchorMax = mainBtnCfg.IconPosition.AnchorMax, OffsetMin = mainBtnCfg.IconPosition.OffsetMin, OffsetMax = mainBtnCfg.IconPosition.OffsetMax } } });
+                else if (btn_icon.StartsWith("http"))
+                    builder.Add(new CuiElement { Name = $"{MAIN_BUTTON}_Img", Parent = MAIN_BUTTON, Components = { new CuiRawImageComponent { Color = mainBtnCfg.IconColor, Png = (string)ImageLibrary?.Call("GetImage", "ai_btn_img") }, new CuiRectTransformComponent { AnchorMin = mainBtnCfg.IconPosition.AnchorMin, AnchorMax = mainBtnCfg.IconPosition.AnchorMax, OffsetMin = mainBtnCfg.IconPosition.OffsetMin, OffsetMax = mainBtnCfg.IconPosition.OffsetMax } } });
+                else
+                    builder.Add(new CuiElement { Name = $"{MAIN_BUTTON}_Img", Parent = MAIN_BUTTON, Components = { new CuiImageComponent { Color = mainBtnCfg.IconColor, Sprite = btn_icon }, new CuiRectTransformComponent { AnchorMin = mainBtnCfg.IconPosition.AnchorMin, AnchorMax = mainBtnCfg.IconPosition.AnchorMax, OffsetMin = mainBtnCfg.IconPosition.OffsetMin, OffsetMax = mainBtnCfg.IconPosition.OffsetMax } } });
+            }
+            builder.Add(new CuiButton { Button = { Color = "0 0 0 0", Command = "cmdopeninventory" }, Text = { Text = (string.IsNullOrEmpty(mainBtnCfg.Icon) ? lang.GetMessage("UI_MAIN_BTN", this, player.UserIDString) : "" ), Font = "robotocondensed-bold.ttf", FontSize = 20, Align = TextAnchor.MiddleCenter, Color = "1 1 1 1" }, RectTransform = { AnchorMin = "0 0", AnchorMax = "1 1", OffsetMin = "0 0", OffsetMax = "0 0" } }, MAIN_BUTTON, $"{MAIN_BUTTON}_Btn");
             
             CuiHelper.AddUi(player, builder);
         }
@@ -1788,16 +1790,23 @@ namespace Oxide.Plugins
             // close button
             var closeBtnCfg = config.user_experience.close_button;
             builder.Add(new CuiPanel { Image = { Color = closeBtnCfg.BackgroundColor }, RectTransform = { AnchorMin = closeBtnCfg.Position.AnchorMin, AnchorMax = closeBtnCfg.Position.AnchorMax, OffsetMin = closeBtnCfg.Position.OffsetMin, OffsetMax = closeBtnCfg.Position.OffsetMax } }, BACKDROP_PANEL, CLOSE_BUTTON);
-            builder.Add(new CuiPanel { Image = { Color = closeBtnCfg.IconColor, Sprite = closeBtnCfg.Icon }, RectTransform = { AnchorMin = closeBtnCfg.IconPosition.AnchorMin, AnchorMax = closeBtnCfg.IconPosition.AnchorMax, OffsetMin = closeBtnCfg.IconPosition.OffsetMin, OffsetMax = closeBtnCfg.IconPosition.OffsetMax } }, CLOSE_BUTTON, $"{CLOSE_BUTTON}_ICON");
-            builder.Add(new CuiButton { Button = { Color = "0 0 0 0", Command = CLOSE_COMMAND }, Text = { Text = "" }, RectTransform = { AnchorMin = closeBtnCfg.IconPosition.AnchorMin, AnchorMax = closeBtnCfg.IconPosition.AnchorMax, OffsetMin = closeBtnCfg.IconPosition.OffsetMin, OffsetMax = closeBtnCfg.IconPosition.OffsetMax } }, CLOSE_BUTTON, $"{CLOSE_BUTTON}_Btn");
+            if (!string.IsNullOrEmpty(closeBtnCfg.Icon))
+            {
+                builder.Add(new CuiPanel { Image = { Color = closeBtnCfg.IconColor, Sprite = closeBtnCfg.Icon }, RectTransform = { AnchorMin = closeBtnCfg.IconPosition.AnchorMin, AnchorMax = closeBtnCfg.IconPosition.AnchorMax, OffsetMin = closeBtnCfg.IconPosition.OffsetMin, OffsetMax = closeBtnCfg.IconPosition.OffsetMax } }, CLOSE_BUTTON, $"{CLOSE_BUTTON}_ICON");
+            }
+            builder.Add(new CuiButton { Button = { Color = "0 0 0 0", Command = CLOSE_COMMAND }, Text = { Text = (string.IsNullOrEmpty(closeBtnCfg.Icon) ? lang.GetMessage("UICLOSE", this, player.UserIDString) : ""), Font = "robotocondensed-bold.ttf", FontSize = 20, Align = TextAnchor.MiddleCenter, Color = "1 1 1 1" }, RectTransform = { AnchorMin = closeBtnCfg.IconPosition.AnchorMin, AnchorMax = closeBtnCfg.IconPosition.AnchorMax, OffsetMin = closeBtnCfg.IconPosition.OffsetMin, OffsetMax = closeBtnCfg.IconPosition.OffsetMax } }, CLOSE_BUTTON, $"{CLOSE_BUTTON}_Btn");
 
+            // FIXME: if we ever add more settings, we should use something different here
             if (config.user_experience.main_button.Enabled)
             {
                 // settings button
                 var settingsBtnCfg = config.user_experience.settings_button;
                 builder.Add(new CuiPanel { Image = { Color = settingsBtnCfg.BackgroundColor }, RectTransform = { AnchorMin = settingsBtnCfg.Position.AnchorMin, AnchorMax = settingsBtnCfg.Position.AnchorMax, OffsetMin = settingsBtnCfg.Position.OffsetMin, OffsetMax = settingsBtnCfg.Position.OffsetMax } }, BACKDROP_PANEL, SETTINGS_BUTTON);
-                builder.Add(new CuiPanel { Image = { Color = settingsBtnCfg.IconColor, Sprite = settingsBtnCfg.Icon }, RectTransform = { AnchorMin = settingsBtnCfg.IconPosition.AnchorMin, AnchorMax = settingsBtnCfg.IconPosition.AnchorMax, OffsetMin = settingsBtnCfg.IconPosition.OffsetMin, OffsetMax = settingsBtnCfg.IconPosition.OffsetMax } }, SETTINGS_BUTTON, $"{SETTINGS_BUTTON}_ICON");
-                builder.Add(new CuiButton { Button = { Color = "0 0 0 0", Command = "cmdopenaisettings" }, Text = { Text = "" }, RectTransform = { AnchorMin = settingsBtnCfg.IconPosition.AnchorMin, AnchorMax = settingsBtnCfg.IconPosition.AnchorMax, OffsetMin = settingsBtnCfg.IconPosition.OffsetMin, OffsetMax = settingsBtnCfg.IconPosition.OffsetMax } }, SETTINGS_BUTTON, $"{SETTINGS_BUTTON}_Btn");
+                if (!string.IsNullOrEmpty(settingsBtnCfg.Icon))
+                {
+                    builder.Add(new CuiPanel { Image = { Color = settingsBtnCfg.IconColor, Sprite = settingsBtnCfg.Icon }, RectTransform = { AnchorMin = settingsBtnCfg.IconPosition.AnchorMin, AnchorMax = settingsBtnCfg.IconPosition.AnchorMax, OffsetMin = settingsBtnCfg.IconPosition.OffsetMin, OffsetMax = settingsBtnCfg.IconPosition.OffsetMax } }, SETTINGS_BUTTON, $"{SETTINGS_BUTTON}_ICON");
+                }
+                builder.Add(new CuiButton { Button = { Color = "0 0 0 0", Command = "cmdopenaisettings" }, Text = { Text = (string.IsNullOrEmpty(settingsBtnCfg.Icon) ? lang.GetMessage("UI_SETTINGS_BTN", this, player.UserIDString) : ""), Font = "robotocondensed-bold.ttf", FontSize = 20, Align = TextAnchor.MiddleCenter, Color = "1 1 1 1" }, RectTransform = { AnchorMin = settingsBtnCfg.IconPosition.AnchorMin, AnchorMax = settingsBtnCfg.IconPosition.AnchorMax, OffsetMin = settingsBtnCfg.IconPosition.OffsetMin, OffsetMax = settingsBtnCfg.IconPosition.OffsetMax } }, SETTINGS_BUTTON, $"{SETTINGS_BUTTON}_Btn");
             }
 
             // help button
@@ -2853,7 +2862,7 @@ namespace Oxide.Plugins
         public class UX
         {
             [JsonProperty("Main UI Button")]
-            public MainButton main_button = new MainButton { BackgroundColor = "0.969 0.922 0.882 0.15", Position = { AnchorMin = "0.5 0", AnchorMax = "0.5 0", OffsetMin = "-263 18", OffsetMax = "-204 78" }, Icon = "assets/icons/inventory.png", IconColor = "0.9 0.9 0.9 1" };
+            public MainButton main_button = new MainButton { BackgroundColor = "0.969 0.922 0.882 0.15", Position = { AnchorMin = "0.5 0", AnchorMax = "0.5 0", OffsetMin = "-263 18", OffsetMax = "-204 78" }, Icon = "assets/icons/inventory.png", IconColor = "0.9 0.9 0.9 1", IconPosition = { AnchorMin = "0 0", AnchorMax = "1 1", OffsetMin = "5 5", OffsetMax = "-5 -5" } };
 
             [JsonProperty("Close Button")]
             public CustomButton close_button = new CustomButton { BackgroundColor = "0.969 0.922 0.882 0.11", Position = { AnchorMin = "0.5 0", AnchorMax = "0.5 0", OffsetMin = "-249 76", OffsetMax = "-213 112" }, Icon = "assets/icons/close.png", IconColor = "0.8 0.28 0.2 1", IconPosition = { AnchorMin = "0 0", AnchorMax = "1 1", OffsetMin = "5 5", OffsetMax = "-5 -5" } };
@@ -2861,8 +2870,8 @@ namespace Oxide.Plugins
             [JsonProperty("Settings Button")]
             public CustomButton settings_button = new CustomButton { BackgroundColor = "0.969 0.922 0.882 0.11", Position = { AnchorMin = "0.5 0", AnchorMax = "0.5 0", OffsetMin = "-285 82", OffsetMax = "-255 112" }, Icon = "assets/icons/gear.png", IconPosition = { AnchorMin = "0 0", AnchorMax = "1 1", OffsetMin = "5 5", OffsetMax = "-5 -5" } };
 
-            [JsonProperty("Help Button")]
-            public CustomButton help_button = new CustomButton { BackgroundColor = "0.969 0.922 0.882 0.11", Position = { AnchorMin = "0.5 0", AnchorMax = "0.5 0", OffsetMin = "-317 82", OffsetMax = "-287 112" }, Icon = "assets/icons/info.png", IconPosition = { AnchorMin = "0 0", AnchorMax = "1 1", OffsetMin = "5 5", OffsetMax = "-5 -5" } };
+            // [JsonProperty("Help Button")]
+            // public CustomButton help_button = new CustomButton { BackgroundColor = "0.969 0.922 0.882 0.11", Position = { AnchorMin = "0.5 0", AnchorMax = "0.5 0", OffsetMin = "-317 82", OffsetMax = "-287 112" }, Icon = "assets/icons/info.png", IconPosition = { AnchorMin = "0 0", AnchorMax = "1 1", OffsetMin = "5 5", OffsetMax = "-5 -5" } };
         }
 
         public class CustomButton
@@ -2874,7 +2883,7 @@ namespace Oxide.Plugins
             [JsonProperty("Position of the Button")]
             public CuiBox Position = new CuiBox();
 
-            [JsonProperty("Icon shown on the button")]
+            [JsonProperty("Icon shown on the button (null = show text)")]
             public string Icon = "assets/icons/gear.png";
             
             [JsonProperty("Icon Color")]
@@ -3456,9 +3465,12 @@ namespace Oxide.Plugins
             {
                 ["UICLOSE"] = "CLOSE",
                 ["UI_OK"] = "OK",
+
+                ["UI_MAIN_BTN"] = "Inventory",
                 
                 ["UI_SETTINGS_HEADER"] = "Change Settings",
                 ["UI_SETTINGS_TOGGLE_MAIN_BUTTON"] = "Enable Main Button",
+                ["UI_SETTINGS_BTN"] = "Settings",
 
                 ["RANDOM"] = "Random",
                 ["CAN_FAIL"] = "<color=#FF0000>This process can fail!</color>",
