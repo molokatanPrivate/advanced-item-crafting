@@ -647,6 +647,49 @@ namespace Oxide.Plugins
         }
         #endregion Commands:Perks
 
+        #region Commands:ArmorSlots
+        
+        [ConsoleCommand("cmdaddarmorslot")]
+        void CmdAddArmorSlot(ConsoleSystem.Arg arg)
+        {
+            var player = arg.Player();
+            if (player == null) return;
+
+            var selectedItemUID = Convert.ToUInt64(arg.Args[0]);
+            
+            var itemToMod = player.inventory.FindItemByUID(new ItemId(selectedItemUID));
+            if (itemToMod == null) return;
+
+            var ItemModWearable = itemToMod.info.ItemModWearable;
+            if (ItemModWearable == null) return;
+            
+            if (ItemModWearable.TryGetComponent<ItemModContainerArmorSlot>(out var component))
+            {
+                int slots = itemToMod.contents?.canAcceptItem != null ? component.capacity : 0;
+
+                if (slots >= component.MaxSlots) return;
+
+                // move insets to player inventory before we craft
+                for(int i=0; i < itemToMod.contents?.itemList.Count(); i++)
+                {
+                    if (itemToMod.contents?.itemList[i] == null) continue;
+                    itemToMod.contents?.itemList[i].MoveToContainer(player.inventory.containerMain);
+                }
+                // reset contents an create for a given capacity
+                itemToMod.contents = null;
+                component.CreateAtCapacity(slots + 1, itemToMod);
+            }
+            else
+            {
+                Puts("nö mit ö");
+            }
+
+            // FIXME: need to show slots
+        }
+
+        #endregion Commands:ArmorSlots
+
+
         #endregion Commands
 
         #region Actions
@@ -1256,6 +1299,9 @@ namespace Oxide.Plugins
 
             public bool restricted = false;
             public bool named = false;
+            public bool wearable = false;
+            public int maxArmorSlots = 0;
+            public int currentArmorSlots = 0;
 
             public List<PerkEntry> perks { get; private set; }
             public EpicEntry buff { get; private set; }
@@ -1299,6 +1345,20 @@ namespace Oxide.Plugins
                 buff = GetEpicBuff(item);
 
                 Slot = item.position;
+
+                wearable = item.info.isWearable;
+
+                if (wearable)
+                {
+                    var ItemModWearable = item.info.ItemModWearable;
+                    if (ItemModWearable == null) return;
+            
+                    if (ItemModWearable.TryGetComponent<ItemModContainerArmorSlot>(out var component))
+                    {
+                        currentArmorSlots = item.contents?.canAcceptItem != null ? component.capacity : 0;
+                        maxArmorSlots = component.MaxSlots;
+                    }
+                }
             }
 
             public bool hasCondition { get { return maxCondition > 0f; } }
@@ -2086,7 +2146,13 @@ namespace Oxide.Plugins
                 {
                     if (permission.UserHasPermission(player.UserIDString, perm_enhance) && CanReceiveEpicBuff(item))
                         builder.AddActionButton(lang.GetMessage( "UI_ITEM_DETAILS_ADD_EPIC_BUFF", this, player.UserIDString), offset, "assets/icons/authorize.png", $"cmdshowepicbuffselection {item.uid.Value} None true", ITEM_ACTIONS_CONTAINER, "ADD_EPIC_BUFF");
-                } 
+                }
+                offset += 33;
+            }
+            
+            if (item.wearable && item.currentArmorSlots < item.maxArmorSlots)
+            {
+                builder.AddActionButton(lang.GetMessage( "ADD_ARMOR_SLOT", this, player.UserIDString), offset, "assets/icons/gear.png", $"cmdaddarmorslot {item.uid.Value}", ITEM_ACTIONS_CONTAINER, "ADD_ARMOR_SLOTS");
             }
         }
 
@@ -2917,34 +2983,6 @@ namespace Oxide.Plugins
             public string OffsetMax = "0 0";
         }
 
-        /**
-        public class CustomButton
-        {
-            [JsonProperty("Should show a custom button on the Hud? (default = false)")]
-            public bool enabled = false;
-
-            [JsonProperty("Icon shown on the button")]
-            public string Icon = "assets/icons/inventory.png";
-
-            [JsonProperty("Should we show that button on the HUD or as an Overlay?")]
-            public string Parent = "Overlay";
-
-            [JsonProperty("Brackground Color")]
-            public string BackgroundColor = "0.969 0.922 0.882 0.15";
-
-            [JsonProperty("Anchor Min")]
-            public string AnchorMin = "0.5 0";
-
-            [JsonProperty("Anchor Max")]
-            public string AnchorMax = "0.5 0";
-
-            [JsonProperty("Offset Min")]
-            public string OffsetMin = "-263 18";
-
-            [JsonProperty("Offset Max")]
-            public string OffsetMax = "-204 78";
-        }**/
-
         public class AdvancedCraftSettings
         {
             [JsonProperty("Add Perk")]
@@ -2961,6 +2999,9 @@ namespace Oxide.Plugins
 
             [JsonProperty("Unveil Perk")]
             public UnveilPerkSettings unveil_perk_settings = new UnveilPerkSettings();
+
+            [JsonProperty("Upgrade Epic Tier")]
+            public UpgradeEpicTierSettings upgrade_epic_settings = new UpgradeEpicTierSettings();
         }
 
         public class AddPerkSettings
@@ -3081,6 +3122,30 @@ namespace Oxide.Plugins
 
             [JsonProperty("Effect played when kit mod was revealed")]
             public string success_effect = "assets/prefabs/misc/halloween/lootbag/effects/gold_open.prefab";
+        }
+
+        public class UpgradeEpicTierSettings
+        {
+            [JsonProperty("enabled")]
+            public bool enabled = true;
+
+            [JsonProperty("Item to use when upgrading an epic item")]
+            public CraftItem craft_item = new CraftItem();
+
+            [JsonProperty("Chance that upgrading can fail (default = 25%)")]
+            public float upgrade_fail_chance = 0.25f;
+
+            [JsonProperty("Chance that epic tier will downgrade if upgrade attempt failed (default = 25%)")]
+            public float downgrade_chance = 0.25f;
+
+            [JsonProperty("Players can loose the item if lowest tier downgrades")]
+            public bool can_loose_item = true;
+
+            [JsonProperty("Player can receive a perfect S tier item")]
+            public bool can_receive_perfect_item = true;
+
+            [JsonProperty("Perfect S tier items exceed the max value by x% (default = 10%)")]
+            public float perfect_item_overruns_by = 0.1f;
         }
 
         public class CraftItem
