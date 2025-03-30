@@ -774,9 +774,10 @@ namespace Oxide.Plugins
             {
                 perkString += $"[{perk.Perk} {perk.Value}]";
             }
-
-            if (baseItem.buff == null)
+            
+            if (baseItem.buff == null && !string.IsNullOrEmpty(perkConfig.enhancementSettings.item_name_prefix) && string.IsNullOrEmpty(itemToMod.name))
                 itemToMod.name = $"{perkConfig.enhancementSettings.item_name_prefix} {itemToMod.info.displayName?.english}";
+                // itemToMod.name = baseItem.DisplayName.StartsWith(perkConfig.enhancementSettings.item_name_prefix) ? baseItem.DisplayName : $"{perkConfig.enhancementSettings.item_name_prefix} {baseItem.DisplayName}";
             
             itemToMod.text = perkString;
             itemToMod.MarkDirty();
@@ -845,9 +846,9 @@ namespace Oxide.Plugins
             {
                 perkString += $"[{perk.Perk} {perk.Value}]";
             }
-
-            if (baseItem.buff == null && !string.IsNullOrEmpty(perkConfig.enhancementSettings.item_name_prefix))
-                itemToMod.name = $"{perkConfig.enhancementSettings.item_name_prefix} {(!string.IsNullOrEmpty(itemToMod.name) ? itemToMod.name : itemToMod.info.displayName?.english)}";
+            
+            if (baseItem.buff == null && !string.IsNullOrEmpty(perkConfig.enhancementSettings.item_name_prefix) && string.IsNullOrEmpty(itemToMod.name))
+                itemToMod.name = $"{perkConfig.enhancementSettings.item_name_prefix} {itemToMod.info.displayName?.english}";
 
             itemToMod.text = perkString;
             itemToMod.MarkDirty();
