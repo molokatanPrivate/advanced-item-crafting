@@ -36,7 +36,7 @@ using UnityEngine;
  **/
 namespace Oxide.Plugins
 {
-    [Info("AdvancedItemCrafting", "molokatan", "1.0.2"), Description("User Interface and advanced crafting options for Item Perks and Epic Loot")]
+    [Info("AdvancedItemCrafting", "molokatan", "1.0.3"), Description("User Interface and advanced crafting options for Item Perks and Epic Loot")]
     class AdvancedItemCrafting : RustPlugin
     {
         [PluginReference]
@@ -712,7 +712,7 @@ namespace Oxide.Plugins
                 perkString += $"[{perk.Perk} {perk.Value}]";
             }
 
-            if (baseItem.buff == null)
+            if (baseItem.buff == null && string.IsNullOrEmpty(itemToMod.name))
             {
                 if (baseItem.named)
                     itemToMod.name = baseItem.DisplayName;
@@ -774,8 +774,8 @@ namespace Oxide.Plugins
             {
                 perkString += $"[{perk.Perk} {perk.Value}]";
             }
-
-            if (baseItem.buff == null)
+            
+            if (baseItem.buff == null && !string.IsNullOrEmpty(perkConfig.enhancementSettings.item_name_prefix) && string.IsNullOrEmpty(itemToMod.name))
                 itemToMod.name = $"{perkConfig.enhancementSettings.item_name_prefix} {itemToMod.info.displayName?.english}";
             
             itemToMod.text = perkString;
@@ -845,9 +845,9 @@ namespace Oxide.Plugins
             {
                 perkString += $"[{perk.Perk} {perk.Value}]";
             }
-
-            if (baseItem.buff == null && !string.IsNullOrEmpty(perkConfig.enhancementSettings.item_name_prefix))
-                itemToMod.name = $"{perkConfig.enhancementSettings.item_name_prefix} {(!string.IsNullOrEmpty(itemToMod.name) ? itemToMod.name : itemToMod.info.displayName?.english)}";
+            
+            if (baseItem.buff == null && !string.IsNullOrEmpty(perkConfig.enhancementSettings.item_name_prefix) && string.IsNullOrEmpty(itemToMod.name))
+                itemToMod.name = $"{perkConfig.enhancementSettings.item_name_prefix} {itemToMod.info.displayName?.english}";
 
             itemToMod.text = perkString;
             itemToMod.MarkDirty();
