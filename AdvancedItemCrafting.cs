@@ -712,7 +712,7 @@ namespace Oxide.Plugins
                 perkString += $"[{perk.Perk} {perk.Value}]";
             }
 
-            if (baseItem.buff == null)
+            if (baseItem.buff == null && string.IsNullOrEmpty(itemToMod.name))
             {
                 if (baseItem.named)
                     itemToMod.name = baseItem.DisplayName;
@@ -777,7 +777,6 @@ namespace Oxide.Plugins
             
             if (baseItem.buff == null && !string.IsNullOrEmpty(perkConfig.enhancementSettings.item_name_prefix) && string.IsNullOrEmpty(itemToMod.name))
                 itemToMod.name = $"{perkConfig.enhancementSettings.item_name_prefix} {itemToMod.info.displayName?.english}";
-                // itemToMod.name = baseItem.DisplayName.StartsWith(perkConfig.enhancementSettings.item_name_prefix) ? baseItem.DisplayName : $"{perkConfig.enhancementSettings.item_name_prefix} {baseItem.DisplayName}";
             
             itemToMod.text = perkString;
             itemToMod.MarkDirty();
