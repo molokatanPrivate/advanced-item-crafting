@@ -23,8 +23,6 @@ using UnityEngine;
  * - most translations are used from Epic Items and Item Perks to make transformation easier
  * 
  * TODOs by priority:
- * - refactor code to be more efficient
- * - stacked items?
  * - remove inconsitencies when using CuiPanel etc
  * - revise UI component names and coords
  * 
@@ -37,7 +35,7 @@ using UnityEngine;
  **/
 namespace Oxide.Plugins
 {
-    [Info("AdvancedItemCrafting", "molokatan", "1.0.3"), Description("User Interface and advanced crafting options for Item Perks and Epic Loot")]
+    [Info("AdvancedItemCrafting", "molokatan", "1.0.4"), Description("User Interface and advanced crafting options for Item Perks and Epic Loot")]
     class AdvancedItemCrafting : RustPlugin
     {
         [PluginReference]
@@ -103,7 +101,7 @@ namespace Oxide.Plugins
             }
             else
             {
-                ServerMgr.Instance.StartCoroutine(LoadEpicConfiguration());
+                LoadEpicConfiguration();
             }
 
             if (ItemPerks == null || !ItemPerks.IsLoaded)
@@ -113,7 +111,7 @@ namespace Oxide.Plugins
             }
             else
             {
-                ServerMgr.Instance.StartCoroutine(LoadItemPerksConfiguration());
+                LoadItemPerksConfiguration();
             }
             RegisterPermissions();
 
@@ -383,6 +381,10 @@ namespace Oxide.Plugins
             // FIXME: show an error message if it did not work?
             if (!PayItems(player, epicConfig.scrapper_settings.currency_shortname, epicConfig.scrapper_settings.currency_skin, epicConfig.scrapper_settings.currency_name, cost)) return;
 
+            // we want to make sure only 1 item gets the epic buff
+            if (itemToEnhance.amount > 1)
+                itemToEnhance = itemToEnhance.SplitItem(1);
+
             EpicLoot?.Call<string>("GenerateItem", player, selectedBuff.ToString(), new List<string> { itemToEnhance.info.shortname }, null, true, itemToEnhance);
 
             // refeshing inventory to remove payments and show the new item
@@ -429,6 +431,9 @@ namespace Oxide.Plugins
 
             int amount;
             if (!epicConfig.scrapper_settings.scrapper_value.TryGetValue(baseItem.buff.Tier, out amount)) return;
+
+            if (itemToSalvage.amount > 1)
+                itemToSalvage = itemToSalvage.SplitItem(1);
 
             itemToSalvage.RemoveFromContainer();
             var payment = ItemManager.CreateByName(epicConfig.scrapper_settings.currency_shortname, Math.Max(amount, 1), epicConfig.scrapper_settings.currency_skin);
@@ -726,7 +731,7 @@ namespace Oxide.Plugins
             }
             else
             {
-                Puts("nö mit ö");
+                Puts("nï¿½ mit ï¿½");
             }
 
             // now we reopen the selection
@@ -861,7 +866,11 @@ namespace Oxide.Plugins
             {
                 perkString += $"[{perk.Perk} {perk.Value}]";
             }
-            
+
+            // we want to make sure only 1 item gets the perk buff
+            if (itemToMod.amount > 1)
+                itemToMod = itemToMod.SplitItem(1);
+
             if (baseItem.buff == null && !string.IsNullOrEmpty(perkConfig.enhancementSettings.item_name_prefix) && string.IsNullOrEmpty(itemToMod.name))
                 itemToMod.name = $"{perkConfig.enhancementSettings.item_name_prefix} {itemToMod.info.displayName?.english}";
             
@@ -931,6 +940,10 @@ namespace Oxide.Plugins
             {
                 perkString += $"[{perk.Perk} {perk.Value}]";
             }
+
+            // we want to make sure only 1 item gets the perk buff
+            if (itemToMod.amount > 1)
+                itemToMod = itemToMod.SplitItem(1);
             
             if (baseItem.buff == null && !string.IsNullOrEmpty(perkConfig.enhancementSettings.item_name_prefix) && string.IsNullOrEmpty(itemToMod.name))
                 itemToMod.name = $"{perkConfig.enhancementSettings.item_name_prefix} {itemToMod.info.displayName?.english}";
@@ -3639,25 +3652,20 @@ namespace Oxide.Plugins
             config.craft_settings.unveil_perk_settings.craft_item.amount = 0;
         }
 
-        private IEnumerator LoadEpicConfiguration()
+        private void LoadEpicConfiguration()
         {
-            string url = "file://" + Interface.Oxide.ConfigDirectory + Path.DirectorySeparatorChar + "EpicLoot.json";
-            using (WWW www = new WWW(url))
+            try
             {
-                yield return www;
+                var fileContent = File.ReadAllText(Interface.Oxide.ConfigDirectory + Path.DirectorySeparatorChar + "EpicLoot.json");
+                Puts("Configuration file EpicLoot.json found. Loading...");
+                epicConfig = JsonConvert.DeserializeObject<EpicLootConfiguration>(fileContent);
 
-                if (www.error == null)
-                {
-                    Puts("Configuration file EpicLoot.json found. Loading...");
-                    epicConfig = JsonConvert.DeserializeObject<EpicLootConfiguration>(www.text);
-
-                    GetEpicEnhanceableItems();
-                }
-                else
-                {
-                    Puts("Configuration file EpicLoot.json not found. Please fix your setup.");
-                    Interface.Oxide.UnloadPlugin(Name);
-                }
+                GetEpicEnhanceableItems();
+            }
+            catch
+            {
+                Puts("Configuration file EpicLoot.json not found. Please fix your setup.");
+                Interface.Oxide.UnloadPlugin(Name);
             }
         }
 
@@ -3681,25 +3689,20 @@ namespace Oxide.Plugins
             }
         }
 
-        private IEnumerator LoadItemPerksConfiguration()
+        private void LoadItemPerksConfiguration()
         {
-            string url = "file://" + Interface.Oxide.ConfigDirectory + Path.DirectorySeparatorChar + "ItemPerks.json";
-            using (WWW www = new WWW(url))
+            try
             {
-                yield return www;
-
-                if (www.error == null)
-                {
-                    Puts($"Configuration file ItemPerks.json found. Loading...");
-                    perkConfig = JsonConvert.DeserializeObject<ItemPerksConfiguration>(www.text);
-
-                    GetPerkEnhanceableItems();
-                }
-                else
-                {
-                    Puts($"Configuration file ItemPerks.json not found. Please fix your setup.");
-                    Interface.Oxide.UnloadPlugin(Name);
-                }
+                var fileContent = File.ReadAllText(Interface.Oxide.ConfigDirectory + Path.DirectorySeparatorChar + "ItemPerks.json");
+                Puts($"Configuration file ItemPerks.json found. Loading...");
+                perkConfig = JsonConvert.DeserializeObject<ItemPerksConfiguration>(fileContent);
+                
+                GetPerkEnhanceableItems();
+            }
+            catch
+            {
+                Puts($"Configuration file ItemPerks.json not found. Please fix your setup.");
+                Interface.Oxide.UnloadPlugin(Name);
             }
         }
 
