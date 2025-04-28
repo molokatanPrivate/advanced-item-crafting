@@ -470,9 +470,8 @@ namespace Oxide.Plugins
             
             BaseItem baseItem = new BaseItem(itemToMod);
 
-            BasicCraftItem craftItem = GetCraftItem(action);
-            int additionalCost = GetCraftItemAmountRequired(craftItem, selectedPerks);
-            bool hasPayment = craftItem != null ? CraftItemAmountAvailable(player, craftItem) >= additionalCost : true;
+            BasicCraftItem craftItem = GetPerkCraftItem(action)?.getTotalRequired(selectedPerks) ?? null;
+            bool hasPayment = craftItem != null ? CraftItemAmountAvailable(player, craftItem) >= craftItem.amount : true;
             
             bool isWeighted = IsWeightedAction(player, action);
             var maxKits = 1;
@@ -489,8 +488,8 @@ namespace Oxide.Plugins
             SelectPerkBuffsPanel(builder, player, headerText, infoText, baseItem, selectedPerks, maxKits, action, hasPayment);
             if (maxKits > 0)
                 SelectKitPanel(builder, player, SELECT_PERK_BUFF_PANEL, 150, baseItem, selectedPerks, maxKits, action);
-            if (craftItem != null && additionalCost > 0)
-                AdditionalCostPanel(builder, player, SELECT_PERK_BUFF_PANEL, craftItem, additionalCost, hasPayment);
+            if (craftItem != null && craftItem.amount > 0)
+                AdditionalCostPanel(builder, player, SELECT_PERK_BUFF_PANEL, craftItem, hasPayment);
 
             CuiHelper.AddUi(player, builder);
         }
@@ -683,10 +682,10 @@ namespace Oxide.Plugins
             ExtendedCuiElementContainer builder = new ExtendedCuiElementContainer();
             AddArmorSlotPanel(builder, player, "sonen header", "nen body", baseItem, true);
 
-            BasicCraftItem craftItem = config.craft_settings.add_armorslots_settings.craft_item.ElementAt(0);
+            BasicCraftItem craftItem = config.craft_settings.add_armorslots_settings.random_craft_item;
 
             if (craftItem != null && craftItem.amount > 0)
-                AdditionalCostPanel(builder, player, SELECT_PERK_BUFF_PANEL, craftItem, craftItem.amount, true);
+                AdditionalCostPanel(builder, player, SELECT_PERK_BUFF_PANEL, craftItem, true);
             
             CuiHelper.AddUi(player, builder);
         }
@@ -749,9 +748,8 @@ namespace Oxide.Plugins
 
             if (!CanUnveilPerkBuff(baseItem)) return false;
 
-            CraftItem craftItem = config.craft_settings.unveil_perk_settings.craft_item;
-            int additionalCost = GetCraftItemAmountRequired(craftItem);
-            bool hasPayment = craftItem != null ? CraftItemAmountAvailable(player, craftItem) >= additionalCost : true;
+            BasicCraftItem craftItem = config.craft_settings.unveil_perk_settings.craft_item;
+            bool hasPayment = craftItem != null ? CraftItemAmountAvailable(player, craftItem) >= craftItem.amount : true;
 
             if (!hasPayment) return false;
 
@@ -791,7 +789,7 @@ namespace Oxide.Plugins
             
             // get payment
             if (craftItem != null)
-                if (!PayItems(player, craftItem.shortname, craftItem.skin, craftItem.display_name, additionalCost)) return false;
+                if (!PayItems(player, craftItem.shortname, craftItem.skin, craftItem.display_name, craftItem.amount)) return false;
             
             baseItem.perks.Add(new PerkEntry { Perk = perkToAdd, Value = mod });
 
@@ -830,9 +828,8 @@ namespace Oxide.Plugins
 
             if (!CanReceivePerkBuff(baseItem)) return false;
 
-            CraftItem craftItem = config.craft_settings.add_perk_settings.craft_item;
-            int additionalCost = GetCraftItemAmountRequired(craftItem, new List<Perk> { selectedPerk });
-            bool hasPayment = craftItem != null ? CraftItemAmountAvailable(player, craftItem) >= additionalCost : true;
+            BasicCraftItem craftItem = config.craft_settings.add_perk_settings.craft_item?.getTotalRequired(new List<Perk> { selectedPerk }) ?? null;
+            bool hasPayment = craftItem != null ? CraftItemAmountAvailable(player, craftItem) >= craftItem.amount : true;
 
             if (!hasPayment) return false;
 
@@ -852,7 +849,7 @@ namespace Oxide.Plugins
             
             // get payment
             if (craftItem != null)
-                if (!PayItems(player, craftItem.shortname, craftItem.skin, craftItem.display_name, additionalCost)) return false;
+                if (!PayItems(player, craftItem.shortname, craftItem.skin, craftItem.display_name, craftItem.amount)) return false;
 
             if (!PayKits(player, requiredKits)) return false;
 
@@ -880,9 +877,8 @@ namespace Oxide.Plugins
 
             if (!CanReceivePerkBuff(baseItem)) return false;
 
-            CraftItem craftItem = config.craft_settings.add_perk_settings.craft_item;
-            int additionalCost = GetCraftItemAmountRequired(craftItem, selectedPerks);
-            bool hasPayment = craftItem != null ? CraftItemAmountAvailable(player, craftItem) >= additionalCost : true;
+            BasicCraftItem craftItem = config.craft_settings.add_perk_settings.craft_item?.getTotalRequired(selectedPerks) ?? null;
+            bool hasPayment = craftItem != null ? CraftItemAmountAvailable(player, craftItem) >= craftItem.amount : true;
 
             if (!hasPayment) return false;
 
@@ -923,7 +919,7 @@ namespace Oxide.Plugins
             
             // get payment
             if (craftItem != null)
-                if (!PayItems(player, craftItem.shortname, craftItem.skin, craftItem.display_name, additionalCost)) return false;
+                if (!PayItems(player, craftItem.shortname, craftItem.skin, craftItem.display_name, craftItem.amount)) return false;
 
             if (!PayKits(player, requiredKits)) return false;
             
@@ -956,9 +952,8 @@ namespace Oxide.Plugins
 
             if (!CanRemovePerkBuff(baseItem)) return false;
 
-            CraftItem craftItem = config.craft_settings.remove_perk_settings.craft_item;
-            int additionalCost = GetCraftItemAmountRequired(craftItem, new List<Perk> { selectedPerk });
-            bool hasPayment = craftItem != null ? CraftItemAmountAvailable(player, craftItem) >= additionalCost : true;
+            BasicCraftItem craftItem = config.craft_settings.remove_perk_settings.craft_item?.getTotalRequired(new List<Perk> { selectedPerk }) ?? null;
+            bool hasPayment = craftItem != null ? CraftItemAmountAvailable(player, craftItem) >= craftItem.amount : true;
 
             if (!hasPayment) return false;
 
@@ -977,7 +972,7 @@ namespace Oxide.Plugins
             
             // get payment
             if (craftItem != null)
-                if (!PayItems(player, craftItem.shortname, craftItem.skin, craftItem.display_name, additionalCost)) return false;
+                if (!PayItems(player, craftItem.shortname, craftItem.skin, craftItem.display_name, craftItem.amount)) return false;
 
             if (!PayKits(player, requiredKits)) return false;
 
@@ -1001,9 +996,8 @@ namespace Oxide.Plugins
 
             if (!CanRemovePerkBuff(baseItem)) return false;
 
-            CraftItem craftItem = config.craft_settings.remove_perk_settings.craft_item;
-            int additionalCost = GetCraftItemAmountRequired(craftItem, selectedPerks);
-            bool hasPayment = craftItem != null ? CraftItemAmountAvailable(player, craftItem) >= additionalCost : true;
+            BasicCraftItem craftItem = config.craft_settings.remove_perk_settings.craft_item?.getTotalRequired(selectedPerks) ?? null;
+            bool hasPayment = craftItem != null ? CraftItemAmountAvailable(player, craftItem) >= craftItem.amount : true;
 
             if (!hasPayment) return false;
 
@@ -1042,7 +1036,7 @@ namespace Oxide.Plugins
             
             // get payment
             if (craftItem != null)
-                if (!PayItems(player, craftItem.shortname, craftItem.skin, craftItem.display_name, additionalCost)) return false;
+                if (!PayItems(player, craftItem.shortname, craftItem.skin, craftItem.display_name, craftItem.amount)) return false;
 
             if (!PayKits(player, requiredKits)) return false;
 
@@ -1071,9 +1065,8 @@ namespace Oxide.Plugins
 
             if (baseItem.perks.Count < 1) return false;
 
-            CraftItem craftItem = config.craft_settings.randomize_perk_settings.randomize_perk_item;
-            int additionalCost = GetCraftItemAmountRequired(craftItem, selectedPerks);
-            bool hasPayment = craftItem != null ? CraftItemAmountAvailable(player, craftItem) >= additionalCost : true;
+            BasicCraftItem craftItem = config.craft_settings.randomize_perk_settings.craft_item?.getTotalRequired(selectedPerks) ?? null;
+            bool hasPayment = craftItem != null ? CraftItemAmountAvailable(player, craftItem) >= craftItem.amount : true;
 
             if (!hasPayment) return false;
 
@@ -1082,7 +1075,7 @@ namespace Oxide.Plugins
             
             // get payment
             if (craftItem != null)
-                if (!PayItems(player, craftItem.shortname, craftItem.skin, craftItem.display_name, additionalCost)) return false;
+                if (!PayItems(player, craftItem.shortname, craftItem.skin, craftItem.display_name, craftItem.amount)) return false;
 
             if (!PayKits(player, requiredKits)) return false;
             
@@ -1223,7 +1216,7 @@ namespace Oxide.Plugins
 
         #region Actions:Payments
 
-        CraftItem GetCraftItem(string action)
+        PerkCraftItem GetPerkCraftItem(string action)
         {
             switch (action)
             {
@@ -1232,29 +1225,15 @@ namespace Oxide.Plugins
                 case "cmdremoveperk":
                     return config.craft_settings.remove_perk_settings.craft_item;
                 case "cmdrandomizeperkvalues":
-                    return config.craft_settings.randomize_perk_settings.randomize_perk_item;
+                    return config.craft_settings.randomize_perk_settings.craft_item;
                 case "cmdunveilperk":
-                    return config.craft_settings.unveil_perk_settings.craft_item;
+                    return config.craft_settings.unveil_perk_settings.craft_item as PerkCraftItem;
                 default:
                     return null;
             }
         }
 
-        int GetCraftItemAmountRequired(CraftItem item, List<Perk> selectedPerks = null)
-        {
-            if (item == null) return 0;
-
-            int amountRequired = item.amount;
-
-            if (selectedPerks == null) return amountRequired;
-
-            foreach (Perk perk in selectedPerks)
-                if (item.cost_per_kit.TryGetValue(perk, out var value)) amountRequired += value;
-
-            return amountRequired;
-        }
-
-        int CraftItemAmountAvailable(BasePlayer player, CraftItem item)
+        int CraftItemAmountAvailable(BasePlayer player, BasicCraftItem item)
         {
             if (item == null) return 0;
             return ItemAmountAvailable(player, item.shortname, item.skin, item.display_name);
@@ -2720,7 +2699,7 @@ namespace Oxide.Plugins
             builder.Add(new CuiElement { Name = "PERK_BAR", Parent = "AI_PERK_CHANCE_BAR", Components = { new CuiRawImageComponent { Color = "0.969 0.922 0.882 0.055", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = $"{chanceOffset} 0", AnchorMax = $"1 1", OffsetMin = $"1 3", OffsetMax = $"-1 -35" } } });
         }
 
-        public void AdditionalCostPanel(ExtendedCuiElementContainer builder, BasePlayer player, string parent, List<BasicCraftItem> craftItems, bool hasPayment = true)
+        public void AdditionalCostPanel(ExtendedCuiElementContainer builder, BasePlayer player, string parent, BasicCraftItem craftItem, bool hasPayment = true)
         {
             builder.Add(new CuiElement { Name = "ADDITIONAL_COST_BACKDROP", Parent = parent, Components = { new CuiRawImageComponent { Color = "0 0 0 1", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0.5 0.5", AnchorMax = "0.5 0.5", OffsetMin = $"-410 43", OffsetMax = $"-206 150" } } });
             
@@ -2729,14 +2708,11 @@ namespace Oxide.Plugins
 
             builder.Add(new CuiElement { Name = $"AdditionalCostBodyPanel", Parent = "ADDITIONAL_COST_BACKDROP", Components = { new CuiRawImageComponent { Color = "0.969 0.922 0.882 0.055", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0.5 1", AnchorMax = "0.5 1", OffsetMin = $"-100 -105", OffsetMax = $"100 -23" } } });
 
-            foreach (var craftItem in craftItems)
-            {
-                builder.Add(new CuiLabel { Text = { Text = $"{craftItem.display_name?.ToUpper()}", Font = "robotocondensed-bold.ttf", FontSize = 12, Align = TextAnchor.MiddleCenter, Color = "1 1 1 1" }, RectTransform = { AnchorMin = $"0.5 1", AnchorMax = $"0.5 1", OffsetMin = $"-80 -24", OffsetMax = $"80 -4" } }, $"AdditionalCostBodyPanel", $"CurrencyName" );
-                builder.Add(new CuiElement { Name = $"Currency", Parent = "AdditionalCostBodyPanel", Components = { new CuiRawImageComponent { Color = hasPayment ? "0.45098 0.55294 0.27059 0.55" : "0.969 0.922 0.882 0.22", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0.5 1", AnchorMax = "0.5 1", OffsetMin = $"-24 -72", OffsetMax = $"24 -24" } } });
+            builder.Add(new CuiLabel { Text = { Text = $"{craftItem.display_name?.ToUpper()}", Font = "robotocondensed-bold.ttf", FontSize = 12, Align = TextAnchor.MiddleCenter, Color = "1 1 1 1" }, RectTransform = { AnchorMin = $"0.5 1", AnchorMax = $"0.5 1", OffsetMin = $"-80 -24", OffsetMax = $"80 -4" } }, $"AdditionalCostBodyPanel", $"CurrencyName" );
+            builder.Add(new CuiElement { Name = $"Currency", Parent = "AdditionalCostBodyPanel", Components = { new CuiRawImageComponent { Color = hasPayment ? "0.45098 0.55294 0.27059 0.55" : "0.969 0.922 0.882 0.22", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0.5 1", AnchorMax = "0.5 1", OffsetMin = $"-24 -72", OffsetMax = $"24 -24" } } });
             
-                var currency = ItemManager.CreateByName(craftItem.shortname, craftItem.amount, craftItem.skin);
-                builder.AddItemIconWithAmount(new BaseItem(currency), 48f, "Currency", "CurrencyIcon");
-            }
+            var currency = ItemManager.CreateByName(craftItem.shortname, craftItem.amount, craftItem.skin);
+            builder.AddItemIconWithAmount(new BaseItem(currency), 48f, "Currency", "CurrencyIcon");
         }
         
         public void SelectKitPanel(ExtendedCuiElementContainer builder, BasePlayer player, string parent, int height, BaseItem itemToMod, List<Perk> selectedKits, int maxKits, string action)
@@ -3195,7 +3171,7 @@ namespace Oxide.Plugins
             public int maxPossiblePerks = 3;
 
             [JsonProperty("Item to use when adding a perk (null = no additional costs)")]
-            public CraftItem craft_item = new CraftItem();
+            public PerkCraftItem craft_item = new PerkCraftItem();
 
             [JsonProperty("Use weighting to select a perk")]
             public WeightRolls weight_system = new WeightRolls();
@@ -3234,7 +3210,7 @@ namespace Oxide.Plugins
             public bool canRemoveAllPerks = false;
 
             [JsonProperty("Item to use when removing a perk (null = no additional costs)")]
-            public CraftItem craft_item = new CraftItem();
+            public PerkCraftItem craft_item = new PerkCraftItem();
 
             [JsonProperty("Use weighting to select a perk")]
             public WeightRolls weight_system = new WeightRolls();
@@ -3246,7 +3222,7 @@ namespace Oxide.Plugins
             public bool enabled = true;
 
             [JsonProperty("Item to use when randomizing perk values (null = no additional costs)")]
-            public CraftItem randomize_perk_item = new CraftItem();
+            public PerkCraftItem craft_item = new PerkCraftItem();
 
             [JsonProperty("Use kits to allow lucky rolls")]
             public bool allow_lucky_rolls = false;
@@ -3273,7 +3249,7 @@ namespace Oxide.Plugins
             public float downgrade_chance = 0.25f;
 
             [JsonProperty("Item to use when upgrading a perk")]
-            public CraftItem craft_item = new CraftItem();
+            public PerkCraftItem craft_item = new PerkCraftItem();
 
             [JsonProperty("Use weighting to select a perk")]
             public WeightRolls weight_system = new WeightRolls();
@@ -3285,7 +3261,7 @@ namespace Oxide.Plugins
             public bool enabled = true;
 
             [JsonProperty("Item to use when unveiling a perk")]
-            public CraftItem craft_item = new CraftItem();
+            public BasicCraftItem craft_item = new BasicCraftItem();
 
             [JsonProperty("can unveil all enabled perks (bypasses black and whitelist)")]
             public bool unrestricted = false;
@@ -3303,7 +3279,7 @@ namespace Oxide.Plugins
             public bool enabled = true;
 
             [JsonProperty("Items to use when upgrading an epic item")]
-            public List<BasicCraftItem> craft_item = new();
+            public BasicCraftItem craft_item = new BasicCraftItem();
 
             [JsonProperty("Chance that upgrading can fail (default = 25%)")]
             public float upgrade_fail_chance = 0.25f;
@@ -3321,36 +3297,70 @@ namespace Oxide.Plugins
             public float perfect_item_overruns_by = 0.1f;
         }
 
+        public enum SlotCraftType
+        {
+            Upgrade,
+            Random
+        }
+
         public class AddArmorSlotsSettings
         {
             [JsonProperty("enabled")]
             public bool enabled = true;
 
-            [JsonProperty("Items to use when adding armor slots")]
-            public List<BasicCraftItem> craft_item = new()
+            [JsonProperty("craft type used for slots (Upgrade, Random)")]
+            public SlotCraftType type = SlotCraftType.Upgrade;
+
+            [JsonProperty("upgrade configurations (max 4 slots)")]
+            public Dictionary<int, SlotCraftConfig> upgrade_chances = new()
             {
-                new BasicCraftItem() {}
+                [1] = new SlotCraftConfig() { success_chance = 0.35f, craft_item = new BasicCraftItem() },
+                [2] = new SlotCraftConfig() { success_chance = 0.25f, craft_item = new BasicCraftItem() },
+                [3] = new SlotCraftConfig() { success_chance = 0.15f, craft_item = new BasicCraftItem() },
+                [4] = new SlotCraftConfig() { success_chance = 0.05f, craft_item = new BasicCraftItem() }
             };
 
-            [JsonProperty("Chance to add one more slot if possible (max 4 slots)")]
-            public Dictionary<int, float> chances = new()
+            [JsonProperty("weight when random crafting (max 4 slots)")]
+            public Dictionary<int, float> random_chances = new()
             {
-                [1] = 0.35f,
-                [2] = 0.25f,
-                [3] = 0.15f,
-                [4] = 0.05f
+                [0] = 200f,
+                [1] = 350f,
+                [2] = 250f,
+                [3] = 150f,
+                [4] = 50f
             };
+
+            public BasicCraftItem random_craft_item = new BasicCraftItem();
 
             [JsonProperty("Maximum available slots for items (not listed = rust standard, max 4 slots)")]
             public Dictionary<string, int> max_slots = new();
         }
 
-        public class CraftItem : BasicCraftItem
+        public class SlotCraftConfig
+        {
+            [JsonProperty("chance that adding a slot is successfull")]
+            public float success_chance;
+
+            [JsonProperty("Item to use when crafting (null = no additional costs)")]
+            public BasicCraftItem craft_item = new();
+        }
+
+        public class PerkCraftItem : BasicCraftItem
         {
             [JsonProperty("Additional cost per Kit consumed")]
             public Dictionary<Perk, int> cost_per_kit = new();
 
-            public BasicCraftItem getBasicCraftItem() => new BasicCraftItem() { display_name = this.display_name, shortname = this.shortname, amount = this.amount, skin = this.skin };
+            public BasicCraftItem getTotalRequired(List<Perk> selectedPerks = null)
+            {
+                int amountRequired = this.amount;
+
+                if (selectedPerks == null) return new BasicCraftItem() { display_name = this.display_name, shortname = this.shortname, amount = amountRequired, skin = this.skin };
+
+                foreach (Perk perk in selectedPerks)
+                    if (this.cost_per_kit.TryGetValue(perk, out var value)) amountRequired += value;
+
+                return new BasicCraftItem() { display_name = this.display_name, shortname = this.shortname, amount = amountRequired, skin = this.skin };
+            }
         }
 
         public class BasicCraftItem
@@ -3610,7 +3620,7 @@ namespace Oxide.Plugins
             config.craft_settings.remove_perk_settings.weight_system.multiplier_2 = 1;
             config.craft_settings.remove_perk_settings.weight_system.multiplier_3 = 2;
 
-            config.craft_settings.randomize_perk_settings.randomize_perk_item.amount = 25;
+            config.craft_settings.randomize_perk_settings.craft_item.amount = 25;
 
             config.craft_settings.upgrade_perk_settings.weight_system.multiplier_1 = 1;
             config.craft_settings.upgrade_perk_settings.weight_system.multiplier_2 = 2;
@@ -3622,7 +3632,7 @@ namespace Oxide.Plugins
 
                 config.craft_settings.add_perk_settings.craft_item.cost_per_kit.Add(perk, 0);
                 config.craft_settings.remove_perk_settings.craft_item.cost_per_kit.Add(perk, 0);
-                config.craft_settings.randomize_perk_settings.randomize_perk_item.cost_per_kit.Add(perk, 0);
+                config.craft_settings.randomize_perk_settings.craft_item.cost_per_kit.Add(perk, 0);
                 config.craft_settings.upgrade_perk_settings.craft_item.cost_per_kit.Add(perk, 0);
             }
 
