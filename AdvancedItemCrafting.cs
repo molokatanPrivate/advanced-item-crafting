@@ -40,6 +40,9 @@ namespace Oxide.Plugins
     {
         [PluginReference]
         private Plugin EpicLoot, ItemPerks, ImageLibrary;
+
+        // permissions for standard crafts
+        const string perm_add_armor_slot = "advanceditemcrafting.standard.add_armor_slot";
         
         // permissions for perk crafting
         const string perm_perk_add = "advanceditemcrafting.perk.add";
@@ -153,6 +156,8 @@ namespace Oxide.Plugins
         #region Permissions
         void RegisterPermissions()
         {
+            permission.RegisterPermission(perm_add_armor_slot, this);
+
             permission.RegisterPermission(perm_perk_add, this);
             permission.RegisterPermission(perm_perk_remove, this);
             permission.RegisterPermission(perm_perk_randomize, this);
@@ -302,6 +307,8 @@ namespace Oxide.Plugins
                 EpicBuffDescription(builder, player, baseItem.buff.Buff);
             }
 
+            HighlightSelectedItem(builder, baseItem);
+
             CuiHelper.AddUi(player, builder);
         }
 
@@ -395,6 +402,8 @@ namespace Oxide.Plugins
             AddEpicBuffDetailsPanel(builder);
             EpicBuffDescription(builder, player, baseItem.buff.Buff);
 
+            HighlightSelectedItem(builder, baseItem);
+
             CuiHelper.AddUi(player, builder);
         }
 
@@ -466,9 +475,8 @@ namespace Oxide.Plugins
             
             BaseItem baseItem = new BaseItem(itemToMod);
 
-            CraftItem craftItem = GetCraftItem(action);
-            int additionalCost = GetCraftItemAmountRequired(craftItem, selectedPerks);
-            bool hasPayment = craftItem != null ? CraftItemAmountAvailable(player, craftItem) >= additionalCost : true;
+            BasicCraftItem craftItem = GetPerkCraftItem(action)?.getTotalRequired(selectedPerks) ?? null;
+            bool hasPayment = craftItem != null ? CraftItemAmountAvailable(player, craftItem) >= craftItem.amount : true;
             
             bool isWeighted = IsWeightedAction(player, action);
             var maxKits = 1;
@@ -485,8 +493,8 @@ namespace Oxide.Plugins
             SelectPerkBuffsPanel(builder, player, headerText, infoText, baseItem, selectedPerks, maxKits, action, hasPayment);
             if (maxKits > 0)
                 SelectKitPanel(builder, player, SELECT_PERK_BUFF_PANEL, 150, baseItem, selectedPerks, maxKits, action);
-            if (craftItem != null && additionalCost > 0)
-                AdditionalCostPanel(builder, player, SELECT_PERK_BUFF_PANEL, craftItem, additionalCost, hasPayment);
+            if (craftItem != null && craftItem.amount > 0)
+                AdditionalCostPanel(builder, player, SELECT_PERK_BUFF_PANEL, craftItem, hasPayment);
 
             CuiHelper.AddUi(player, builder);
         }
@@ -512,6 +520,8 @@ namespace Oxide.Plugins
                 var baseItem = new BaseItem(itemToMod);
                 CreateItemDetailsBase(builder, player, baseItem);
                 CreateItemActions(builder, player, baseItem);
+
+                HighlightSelectedItem(builder, baseItem);
             }
 
             CuiHelper.AddUi(player, builder);
@@ -544,6 +554,8 @@ namespace Oxide.Plugins
 
             CreateItemDetailsBase(builder, player, baseItem);
             CreateItemActions(builder, player, baseItem);
+
+            HighlightSelectedItem(builder, baseItem);
 
             CuiHelper.AddUi(player, builder);
         }
@@ -579,6 +591,8 @@ namespace Oxide.Plugins
 
             CreateItemDetailsBase(builder, player, baseItem);
             CreateItemActions(builder, player, baseItem);
+
+            HighlightSelectedItem(builder, baseItem);
 
             CuiHelper.AddUi(player, builder);
         }
@@ -633,6 +647,8 @@ namespace Oxide.Plugins
             CreateItemDetailsBase(builder, player, baseItem);
             CreateItemActions(builder, player, baseItem);
 
+            HighlightSelectedItem(builder, baseItem);
+
             CuiHelper.AddUi(player, builder);
         }
 
@@ -653,6 +669,78 @@ namespace Oxide.Plugins
         }
         #endregion Commands:Perks
 
+        #region Commands:ArmorSlots
+
+        [ConsoleCommand("cmdconfirmaddarmorslot")]
+        void CmdConfirmAddArmorSlot(ConsoleSystem.Arg arg)
+        {
+            var player = arg.Player();
+            if (player == null) return;
+
+            var selectedItemUID = Convert.ToUInt64(arg.Args[0]);
+            
+            var itemToMod = player.inventory.FindItemByUID(new ItemId(selectedItemUID));
+            if (itemToMod == null) return;
+
+            var baseItem = new BaseItem(itemToMod);
+            
+            ExtendedCuiElementContainer builder = new ExtendedCuiElementContainer();
+            AddArmorSlotPanel(builder, player, "sonen header", "nen body", baseItem, true);
+
+            BasicCraftItem craftItem = config.craft_settings.add_armorslots_settings.random_craft_item;
+
+            if (craftItem != null && craftItem.amount > 0)
+                AdditionalCostPanel(builder, player, SELECT_PERK_BUFF_PANEL, craftItem, true);
+            
+            CuiHelper.AddUi(player, builder);
+        }
+        
+        [ConsoleCommand("cmdaddarmorslot")]
+        void CmdAddArmorSlot(ConsoleSystem.Arg arg)
+        {
+            var player = arg.Player();
+            if (player == null) return;
+
+            var selectedItemUID = Convert.ToUInt64(arg.Args[0]);
+            
+            var itemToMod = player.inventory.FindItemByUID(new ItemId(selectedItemUID));
+            if (itemToMod == null) return;
+
+            var baseItem = new BaseItem(itemToMod);
+
+            var ItemModWearable = itemToMod.info.ItemModWearable;
+            if (ItemModWearable == null) return;
+            
+            if (ItemModWearable.TryGetComponent<ItemModContainerArmorSlot>(out var component))
+            {
+                int slots = itemToMod.contents?.canAcceptItem != null ? itemToMod.contents.capacity : 0;
+                int maxSlots = config.craft_settings.add_armorslots_settings.max_slots.ContainsKey(baseItem.shortname) ? config.craft_settings.add_armorslots_settings.max_slots[baseItem.shortname] : component.MaxSlots;
+
+                if (slots >= maxSlots) return;
+
+                // move insets to player inventory before we craft
+                while(itemToMod.contents?.itemList.Count() > 0)
+                {
+                    var moveItem = itemToMod.contents?.itemList[0];
+                    moveItem.MoveToContainer(player.inventory.containerMain);
+                    moveItem.MarkDirty();
+                }
+                // reset contents and create for a given capacity
+                itemToMod.contents = null;
+                component.CreateAtCapacity(slots + 1, itemToMod);
+            }
+            else
+            {
+                Puts("n� mit �");
+            }
+
+            // now we reopen the selection
+            player.SendConsoleCommand("cmdconfirmaddarmorslot", itemToMod.uid.Value);
+        }
+
+        #endregion Commands:ArmorSlots
+
+
         #endregion Commands
 
         #region Actions
@@ -665,9 +753,8 @@ namespace Oxide.Plugins
 
             if (!CanUnveilPerkBuff(baseItem)) return false;
 
-            CraftItem craftItem = config.craft_settings.unveil_perk_settings.craft_item;
-            int additionalCost = GetCraftItemAmountRequired(craftItem);
-            bool hasPayment = craftItem != null ? CraftItemAmountAvailable(player, craftItem) >= additionalCost : true;
+            BasicCraftItem craftItem = config.craft_settings.unveil_perk_settings.craft_item;
+            bool hasPayment = craftItem != null ? CraftItemAmountAvailable(player, craftItem) >= craftItem.amount : true;
 
             if (!hasPayment) return false;
 
@@ -707,7 +794,7 @@ namespace Oxide.Plugins
             
             // get payment
             if (craftItem != null)
-                if (!PayItems(player, craftItem.shortname, craftItem.skin, craftItem.display_name, additionalCost)) return false;
+                if (!PayItems(player, craftItem.shortname, craftItem.skin, craftItem.display_name, craftItem.amount)) return false;
             
             baseItem.perks.Add(new PerkEntry { Perk = perkToAdd, Value = mod });
 
@@ -746,9 +833,8 @@ namespace Oxide.Plugins
 
             if (!CanReceivePerkBuff(baseItem)) return false;
 
-            CraftItem craftItem = config.craft_settings.add_perk_settings.craft_item;
-            int additionalCost = GetCraftItemAmountRequired(craftItem, new List<Perk> { selectedPerk });
-            bool hasPayment = craftItem != null ? CraftItemAmountAvailable(player, craftItem) >= additionalCost : true;
+            BasicCraftItem craftItem = config.craft_settings.add_perk_settings.craft_item?.getTotalRequired(new List<Perk> { selectedPerk }) ?? null;
+            bool hasPayment = craftItem != null ? CraftItemAmountAvailable(player, craftItem) >= craftItem.amount : true;
 
             if (!hasPayment) return false;
 
@@ -768,7 +854,7 @@ namespace Oxide.Plugins
             
             // get payment
             if (craftItem != null)
-                if (!PayItems(player, craftItem.shortname, craftItem.skin, craftItem.display_name, additionalCost)) return false;
+                if (!PayItems(player, craftItem.shortname, craftItem.skin, craftItem.display_name, craftItem.amount)) return false;
 
             if (!PayKits(player, requiredKits)) return false;
 
@@ -800,9 +886,8 @@ namespace Oxide.Plugins
 
             if (!CanReceivePerkBuff(baseItem)) return false;
 
-            CraftItem craftItem = config.craft_settings.add_perk_settings.craft_item;
-            int additionalCost = GetCraftItemAmountRequired(craftItem, selectedPerks);
-            bool hasPayment = craftItem != null ? CraftItemAmountAvailable(player, craftItem) >= additionalCost : true;
+            BasicCraftItem craftItem = config.craft_settings.add_perk_settings.craft_item?.getTotalRequired(selectedPerks) ?? null;
+            bool hasPayment = craftItem != null ? CraftItemAmountAvailable(player, craftItem) >= craftItem.amount : true;
 
             if (!hasPayment) return false;
 
@@ -843,7 +928,7 @@ namespace Oxide.Plugins
             
             // get payment
             if (craftItem != null)
-                if (!PayItems(player, craftItem.shortname, craftItem.skin, craftItem.display_name, additionalCost)) return false;
+                if (!PayItems(player, craftItem.shortname, craftItem.skin, craftItem.display_name, craftItem.amount)) return false;
 
             if (!PayKits(player, requiredKits)) return false;
             
@@ -880,9 +965,8 @@ namespace Oxide.Plugins
 
             if (!CanRemovePerkBuff(baseItem)) return false;
 
-            CraftItem craftItem = config.craft_settings.remove_perk_settings.craft_item;
-            int additionalCost = GetCraftItemAmountRequired(craftItem, new List<Perk> { selectedPerk });
-            bool hasPayment = craftItem != null ? CraftItemAmountAvailable(player, craftItem) >= additionalCost : true;
+            BasicCraftItem craftItem = config.craft_settings.remove_perk_settings.craft_item?.getTotalRequired(new List<Perk> { selectedPerk }) ?? null;
+            bool hasPayment = craftItem != null ? CraftItemAmountAvailable(player, craftItem) >= craftItem.amount : true;
 
             if (!hasPayment) return false;
 
@@ -901,7 +985,7 @@ namespace Oxide.Plugins
             
             // get payment
             if (craftItem != null)
-                if (!PayItems(player, craftItem.shortname, craftItem.skin, craftItem.display_name, additionalCost)) return false;
+                if (!PayItems(player, craftItem.shortname, craftItem.skin, craftItem.display_name, craftItem.amount)) return false;
 
             if (!PayKits(player, requiredKits)) return false;
 
@@ -925,9 +1009,8 @@ namespace Oxide.Plugins
 
             if (!CanRemovePerkBuff(baseItem)) return false;
 
-            CraftItem craftItem = config.craft_settings.remove_perk_settings.craft_item;
-            int additionalCost = GetCraftItemAmountRequired(craftItem, selectedPerks);
-            bool hasPayment = craftItem != null ? CraftItemAmountAvailable(player, craftItem) >= additionalCost : true;
+            BasicCraftItem craftItem = config.craft_settings.remove_perk_settings.craft_item?.getTotalRequired(selectedPerks) ?? null;
+            bool hasPayment = craftItem != null ? CraftItemAmountAvailable(player, craftItem) >= craftItem.amount : true;
 
             if (!hasPayment) return false;
 
@@ -966,7 +1049,7 @@ namespace Oxide.Plugins
             
             // get payment
             if (craftItem != null)
-                if (!PayItems(player, craftItem.shortname, craftItem.skin, craftItem.display_name, additionalCost)) return false;
+                if (!PayItems(player, craftItem.shortname, craftItem.skin, craftItem.display_name, craftItem.amount)) return false;
 
             if (!PayKits(player, requiredKits)) return false;
 
@@ -995,9 +1078,8 @@ namespace Oxide.Plugins
 
             if (baseItem.perks.Count < 1) return false;
 
-            CraftItem craftItem = config.craft_settings.randomize_perk_settings.randomize_perk_item;
-            int additionalCost = GetCraftItemAmountRequired(craftItem, selectedPerks);
-            bool hasPayment = craftItem != null ? CraftItemAmountAvailable(player, craftItem) >= additionalCost : true;
+            BasicCraftItem craftItem = config.craft_settings.randomize_perk_settings.craft_item?.getTotalRequired(selectedPerks) ?? null;
+            bool hasPayment = craftItem != null ? CraftItemAmountAvailable(player, craftItem) >= craftItem.amount : true;
 
             if (!hasPayment) return false;
 
@@ -1006,7 +1088,7 @@ namespace Oxide.Plugins
             
             // get payment
             if (craftItem != null)
-                if (!PayItems(player, craftItem.shortname, craftItem.skin, craftItem.display_name, additionalCost)) return false;
+                if (!PayItems(player, craftItem.shortname, craftItem.skin, craftItem.display_name, craftItem.amount)) return false;
 
             if (!PayKits(player, requiredKits)) return false;
             
@@ -1147,9 +1229,8 @@ namespace Oxide.Plugins
 
         #region Actions:Payments
 
-        CraftItem GetCraftItem(string action)
+        PerkCraftItem GetPerkCraftItem(string action)
         {
-            CraftItem item = null;
             switch (action)
             {
                 case "cmdaddperk":
@@ -1157,29 +1238,15 @@ namespace Oxide.Plugins
                 case "cmdremoveperk":
                     return config.craft_settings.remove_perk_settings.craft_item;
                 case "cmdrandomizeperkvalues":
-                    return config.craft_settings.randomize_perk_settings.randomize_perk_item;
+                    return config.craft_settings.randomize_perk_settings.craft_item;
                 case "cmdunveilperk":
-                    return config.craft_settings.unveil_perk_settings.craft_item;
+                    return config.craft_settings.unveil_perk_settings.craft_item as PerkCraftItem;
                 default:
                     return null;
             }
         }
 
-        int GetCraftItemAmountRequired(CraftItem item, List<Perk> selectedPerks = null)
-        {
-            if (item == null) return 0;
-
-            int amountRequired = item.amount;
-
-            if (selectedPerks == null) return amountRequired;
-
-            foreach (Perk perk in selectedPerks)
-                if (item.cost_per_kit.TryGetValue(perk, out var value)) amountRequired += value;
-
-            return amountRequired;
-        }
-
-        int CraftItemAmountAvailable(BasePlayer player, CraftItem item)
+        int CraftItemAmountAvailable(BasePlayer player, BasicCraftItem item)
         {
             if (item == null) return 0;
             return ItemAmountAvailable(player, item.shortname, item.skin, item.display_name);
@@ -1270,6 +1337,9 @@ namespace Oxide.Plugins
 
             public bool restricted = false;
             public bool named = false;
+            public bool wearable = false;
+            public int maxArmorSlots = 0;
+            public int currentArmorSlots = 0;
 
             public List<PerkEntry> perks { get; private set; }
             public EpicEntry buff { get; private set; }
@@ -1313,6 +1383,20 @@ namespace Oxide.Plugins
                 buff = GetEpicBuff(item);
 
                 Slot = item.position;
+
+                wearable = item.info.isWearable;
+
+                if (wearable)
+                {
+                    var ItemModWearable = item.info.ItemModWearable;
+                    if (ItemModWearable == null) return;
+            
+                    if (ItemModWearable.TryGetComponent<ItemModContainerArmorSlot>(out var component))
+                    {
+                        currentArmorSlots = item.contents?.canAcceptItem != null ? item.contents.capacity : 0;
+                        maxArmorSlots = component.MaxSlots;
+                    }
+                }
             }
 
             public bool hasCondition { get { return maxCondition > 0f; } }
@@ -1795,7 +1879,6 @@ namespace Oxide.Plugins
             builder.Add(new CuiButton { Button = { Color = "0.45098 0.55294 0.27059 1", Command = $"cmdcloseaisettings" }, Text = { Text = lang.GetMessage("UICLOSE", this, player.UserIDString), Font = "robotocondensed-regular.ttf", FontSize = 16, Align = TextAnchor.MiddleCenter, Color = "1 1 1 1" }, RectTransform = { AnchorMin = "0.2 0", AnchorMax = "0.8 1", OffsetMin = "10 5", OffsetMax = "-10 -5" } }, "ActionsSettingsPanel", "CloseSettingsPanelButton");
         }
 
-
         public void CreateInventoryBase(ExtendedCuiElementContainer builder, BasePlayer player)
         {
             // backdrop
@@ -1862,6 +1945,11 @@ namespace Oxide.Plugins
 
             foreach (var item in playerState.InventoryItems.Values)
                 builder.AddItemButton(item, 50, $"{COMMAND_SELECT_ITEM} {item.uid.Value}", $"{INVENTORY_ITEM_SLOT}_{item.Slot}", $"{ITEM_WRAPPER}_{item.uid.Value}");
+        }
+
+        public void HighlightSelectedItem(ExtendedCuiElementContainer builder, BaseItem item)
+        {
+            builder.Add(new CuiElement { Parent = $"{ITEM_WRAPPER}_{item.uid.Value}_BG", Name = "CURRENT_SELECTED_ITEM", Components = { new CuiRawImageComponent { Color = "0.08627 0.25490 0.38431 1", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0 0", AnchorMax = "1 1", OffsetMin = $"0 0", OffsetMax = $"0 0" } }, DestroyUi = $"CURRENT_SELECTED_ITEM"});
         }
 
         public void AddPlayerBuffsPanel(ExtendedCuiElementContainer builder, BasePlayer player, PlayerState playerState)
@@ -1973,12 +2061,18 @@ namespace Oxide.Plugins
                 foreach (var perk in playerState.activePerkBuffs.OrderBy(p => p.Key.ToString()))
                 {
                     var col = GetColorFromHtml("#077E93");
+                    var buffstring = $"{GetPerkValue(perk.Value, perk.Key)}{GetPerkTypeString(perk.Key)}";
+
+                    if (perkConfig.enhancementSettings.perk_settings.TryGetValue(perk.Key, out PerkSettings settings) && settings.perk_cap > 0 && settings.perk_cap <= perk.Value)
+                    {
+                        buffstring = $"{GetPerkValue(settings.perk_cap, perk.Key)}{GetPerkTypeString(perk.Key)} <color=#FF0000>({buffstring})</color>";
+                    }
 
                     innerContainer.Add(new CuiElement { Name = $"BonusDescription{perk.Key.ToString()}", Parent = "AI_PLAYER_BUFFS_DETAILS", Components = { new CuiRawImageComponent { Color = "0.969 0.922 0.882 0.055", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0 1", AnchorMax = "0.3 1", OffsetMin = $"10 -{23 + offset}", OffsetMax = $"0 -{offset}" } } });
                     innerContainer.Add(new CuiLabel { Text = { Text = lang.GetMessage("UI" + perk.Key.ToString(), ItemPerks, player.UserIDString), Font = "robotocondensed-bold.ttf", FontSize = 12, Align = TextAnchor.MiddleLeft, Color = $"{col.r} {col.g} {col.b} {col.a}" }, RectTransform = { AnchorMin = $"0 0", AnchorMax = $"1 1", OffsetMin = $"3 0", OffsetMax = $"-3 0" } }, $"BonusDescription{perk.Key.ToString()}", $"BonusDescription_Text{perk.Key.ToString()}" );
 
                     innerContainer.Add(new CuiElement { Name = $"BonusDescription{perk.Key.ToString()}", Parent = "AI_PLAYER_BUFFS_DETAILS", Components = { new CuiRawImageComponent { Color = "0.969 0.922 0.882 0.055", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0.3 1", AnchorMax = "1 1", OffsetMin = $"0 -{23 + offset}", OffsetMax = $"-50 -{offset}" } } });
-                    innerContainer.Add(new CuiLabel { Text = { Text = $"{GetPerkValue(perk.Value, perk.Key)}{GetPerkTypeString(perk.Key)}", Font = "robotocondensed-bold.ttf", FontSize = 12, Align = TextAnchor.MiddleLeft, Color = "1 1 1 1" }, RectTransform = { AnchorMin = $"0 0", AnchorMax = $"1 1", OffsetMin = $"3 0", OffsetMax = $"-3 0" } }, $"BonusDescription{perk.Key.ToString()}", $"BonusDescription_Text{perk.Key.ToString()}" );
+                    innerContainer.Add(new CuiLabel { Text = { Text = $"{buffstring}", Font = "robotocondensed-bold.ttf", FontSize = 12, Align = TextAnchor.MiddleLeft, Color = "1 1 1 1" }, RectTransform = { AnchorMin = $"0 0", AnchorMax = $"1 1", OffsetMin = $"3 0", OffsetMax = $"-3 0" } }, $"BonusDescription{perk.Key.ToString()}", $"BonusDescription_Text{perk.Key.ToString()}" );
             
                     innerContainer.Add(new CuiElement { Name = $"BonusDescriptionBtn{perk.Key.ToString()}", Parent = "AI_PLAYER_BUFFS_DETAILS", Components = { new CuiRawImageComponent { Color = "0.969 0.922 0.882 0.055", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "1 1", AnchorMax = "1 1", OffsetMin = $"-50 -{23 + offset}", OffsetMax = $"-10 -{offset}" } } });
                     innerContainer.Add(new CuiPanel { Image = { Color = "1 1 1 1", Sprite = "assets/icons/info.png" }, RectTransform = { AnchorMin = "0 0.5", AnchorMax = "0 0.5", OffsetMin = $"8 -8", OffsetMax = $"24 8" } }, $"BonusDescriptionBtn{perk.Key.ToString()}", $"BonusDescriptionBtn{perk.Key.ToString()}_ICON");
@@ -2042,6 +2136,12 @@ namespace Oxide.Plugins
                 else
                     AddPerkInfo(builder, player, item.perks, "AI_ITEM_INFO", 50);
             }
+
+            // armor slot section
+            for (int i=0; i<item.currentArmorSlots; i++)
+            {
+                builder.Add(new CuiElement { Name = $"AI_INFO_ARMOR_SLOT_{i}", Parent = "AI_ITEM_INFO", Components = { new CuiRawImageComponent { Color = "0.969 0.922 0.882 0.055", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0 0", AnchorMax = "0 0", OffsetMin = $"{20+i*35} 10", OffsetMax = $"{50+i*35} 40" } } });
+            }
             
             // item actions section
             builder.Add(new CuiElement { Name = "AI_ITEM_ACTIONS", Parent = ITEM_DETAILS_CONTAINER, Components = { new CuiRawImageComponent { Color = "0.969 0.922 0.882 0.055", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "1 0", AnchorMax = "1 0", OffsetMin = $"-158 0", OffsetMax = $"0 178" } } });
@@ -2100,11 +2200,79 @@ namespace Oxide.Plugins
                 {
                     if (permission.UserHasPermission(player.UserIDString, perm_enhance) && CanReceiveEpicBuff(item))
                         builder.AddActionButton(lang.GetMessage( "UI_ITEM_DETAILS_ADD_EPIC_BUFF", this, player.UserIDString), offset, "assets/icons/authorize.png", $"cmdshowepicbuffselection {item.uid.Value} None true", ITEM_ACTIONS_CONTAINER, "ADD_EPIC_BUFF");
-                } 
+                }
+                offset += 33;
+            }
+            
+            if (item.wearable && permission.UserHasPermission(player.UserIDString, perm_add_armor_slot) && item.currentArmorSlots < item.maxArmorSlots)
+            {
+                builder.AddActionButton(lang.GetMessage( "ADD_ARMOR_SLOT", this, player.UserIDString), offset, "assets/icons/construction.png", $"cmdconfirmaddarmorslot {item.uid.Value}", ITEM_ACTIONS_CONTAINER, "ADD_ARMOR_SLOTS");
             }
         }
 
         #endregion UIBuilder:ItemDetails
+
+        #region UIBuilder:Standard
+        public void AddArmorSlotPanel(ExtendedCuiElementContainer builder, BasePlayer player, string headerText, string bodyText, BaseItem itemToMod, bool hasPayment)
+        {
+            float chance = 0.3f;
+            int height = (58 + 113 + 12 + 55)/2;
+
+            builder.Add(new CuiElement { Name = ADD_ARMOR_SLOT_PANEL, Parent = BACKDROP_PANEL, Components = { new CuiImageComponent { Color = "0 0 0 0.95", Material = "assets/content/ui/uibackgroundblur-ingamemenu.mat" }, new CuiRectTransformComponent { AnchorMin = "0 0", AnchorMax = "1 1", OffsetMin = $"0 0", OffsetMax = $"0 0" } }, DestroyUi = ADD_ARMOR_SLOT_PANEL });
+            builder.Add(new CuiElement { Name = "ADD_ARMOR_SLOT_PANEL_BACKDROP", Parent = ADD_ARMOR_SLOT_PANEL, Components = { new CuiRawImageComponent { Color = "0 0 0 1", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0.5 0.5", AnchorMax = "0.5 0.5", OffsetMin = $"-202 -{height}", OffsetMax = $"202 {height}" } } });
+            
+            builder.Add(new CuiElement { Name = $"HeaderPanel", Parent = "ADD_ARMOR_SLOT_PANEL_BACKDROP", Components = { new CuiRawImageComponent { Color = "0.969 0.922 0.882 0.11", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0.5 0.5", AnchorMax = "0.5 0.5", OffsetMin = $"-200 {height-22}", OffsetMax = $"200 {height-2}" } } });
+            builder.Add(new CuiLabel { Text = { Text = headerText, Font = "robotocondensed-bold.ttf", FontSize = 14, Align = TextAnchor.MiddleLeft, Color = "1 1 1 1" }, RectTransform = { AnchorMin = $"0 0", AnchorMax = $"1 1", OffsetMin = $"6 0", OffsetMax = $"-6 0" } }, $"HeaderPanel", "HeaderPanel_Text" );
+            
+            builder.Add(new CuiElement { Name = $"BodyPanel", Parent = "ADD_ARMOR_SLOT_PANEL_BACKDROP", Components = { new CuiRawImageComponent { Color = "0.969 0.922 0.882 0.055", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0.5 0.5", AnchorMax = "0.5 0.5", OffsetMin = $"-200 -{height-33}", OffsetMax = $"200 {height-23}" } } });
+            builder.Add(new CuiLabel { Text = { Text = bodyText, Font = "robotocondensed-bold.ttf", FontSize = 12, Align = TextAnchor.MiddleCenter, Color = "1 1 1 1" }, RectTransform = { AnchorMin = $"0 1", AnchorMax = $"1 1", OffsetMin = $"6 -45", OffsetMax = $"-6 -3" } }, $"BodyPanel", $"BodyPanel_Text" );
+
+            // selected item
+            builder.Add(new CuiElement { Name = $"SelectedItem", Parent = "BodyPanel", Components = { new CuiRawImageComponent { Color = "0.969 0.922 0.882 0.22", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0.5 1", AnchorMax = "0.5 1", OffsetMin = $"-24 -103", OffsetMax = $"24 -55" } } });
+            builder.AddItemIconWithArmorSlots(itemToMod, 48f, "SelectedItem", "SelectedItemIcon");
+            
+            // chance
+            if (chance < 1)
+            {
+                builder.Add(new CuiElement { Name = $"AddArmorSlotChances", Parent = "BodyPanel", Components = { new CuiRawImageComponent { Color = "0 0 0 0", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0.5 1", AnchorMax = "0.5 1", OffsetMin = $"-160 -163", OffsetMax = $"160 -113" } } });
+                AddArmorSlotChance(builder, player, chance);
+            }
+
+            // footer
+            builder.Add(new CuiPanel { Image = { Color = "0.969 0.922 0.882 0.11" }, RectTransform = { AnchorMin = "0.5 0.5", AnchorMax = "0.5 0.5", OffsetMin = $"-200 -{height-2}", OffsetMax = $"200 -{height-32}" } }, "ADD_ARMOR_SLOT_PANEL_BACKDROP", "ActionsPanel");
+            builder.Add(new CuiButton { Button = { Color = hasPayment ? "0.45098 0.55294 0.27059 1" : "0.3 0.3 0.3 1", Command = hasPayment ? $"cmdaddarmorslot {itemToMod.uid.ToString()}" : " " }, Text = { Text = lang.GetMessage("UI_PERKBUFFSELECTION_CONFIRM", this, player.UserIDString), Font = "robotocondensed-regular.ttf", FontSize = 16, Align = TextAnchor.MiddleCenter, Color = "1 1 1 1" }, RectTransform = { AnchorMin = "0 0", AnchorMax = "0.5 1", OffsetMin = "10 5", OffsetMax = "-10 -5" } }, "ActionsPanel", "ConfirmButton", "ConfirmButton");
+            builder.Add(new CuiButton { Button = { Color = "0.77255 0.23922 0.15686 1", Command = $"cmdcloseselectperkbuffs {itemToMod.uid.ToString()}" }, Text = { Text = lang.GetMessage("UI_PERKBUFFSELECTION_CANCEL", this, player.UserIDString), Font = "robotocondensed-regular.ttf", FontSize = 16, Align = TextAnchor.MiddleCenter, Color = "1 1 1 1" }, RectTransform = { AnchorMin = "0.5 0", AnchorMax = "1 1", OffsetMin = "10 5", OffsetMax = "-10 -5" } }, "ActionsPanel", "CloseButton");
+        }
+
+        public void AddArmorSlotChance(ExtendedCuiElementContainer builder, BasePlayer player, float chance)
+        {
+            // chances to add a slot
+            builder.Add(new CuiElement { Name = "AI_ADD_ARMOR_SLOT_CHANCE_BAR_CONTAINER", Parent = "AddArmorSlotChances", Components = { new CuiRawImageComponent { Color = "0 0 0 0", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0 1", AnchorMax = "1 1", OffsetMin = "10 -50", OffsetMax = "-10 0" } } });
+            builder.Add(new CuiElement { Name = "AI_ADD_ARMOR_SLOT_CHANCE_BAR", Parent = "AI_ADD_ARMOR_SLOT_CHANCE_BAR_CONTAINER", Components = { new CuiRawImageComponent { Color = "0 0 0 0" }, new CuiRectTransformComponent { AnchorMin = "0 0", AnchorMax = "1 1", OffsetMin = "6 0", OffsetMax = "-6 -3" } } });
+            
+            var min = 0;
+            var middle = chance/2;
+            var col = GetColorFromHtml("#dddd00");
+
+            builder.Add(new CuiLabel { Text = { Text = $"{lang.GetMessage("UI_ADD_SLOT_CHANCE", this, player.UserIDString)}", Font = "robotocondensed-bold.ttf", FontSize = 10, Align = TextAnchor.MiddleCenter, Color = "1 1 1 1" }, RectTransform = { AnchorMin = $"{min} 1", AnchorMax = $"{min + chance} 1", OffsetMin = $"0 -12", OffsetMax = $"0 0" } }, "AI_ADD_ARMOR_SLOT_CHANCE_BAR", "SLOT_TEXT" );
+            builder.Add(new CuiLabel { Text = { Text = $"{Math.Round(chance * 100, 1)}%", Font = "robotocondensed-bold.ttf", FontSize = 10, Align = TextAnchor.MiddleCenter, Color = "1 1 1 1" }, RectTransform = { AnchorMin = $"{middle} 1", AnchorMax = $"{middle} 1", OffsetMin = $"-30 -26", OffsetMax = $"32 -14" } }, "AI_ADD_ARMOR_SLOT_CHANCE_BAR", "SLOT_PERCENT_TEXT" );
+            builder.Add(new CuiElement { Name = "SLOT_SPACER_1", Parent = "AI_ADD_ARMOR_SLOT_CHANCE_BAR", Components = { new CuiRawImageComponent { Color = "1 1 1 1", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = $"{middle} 1", AnchorMax = $"{middle} 1", OffsetMin = $"-1 -33", OffsetMax = $"0 -28" } } });
+            builder.Add(new CuiElement { Name = "SLOT_SPACER_2", Parent = "AI_ADD_ARMOR_SLOT_CHANCE_BAR", Components = { new CuiRawImageComponent { Color = "1 1 1 1", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = $"{min} 1", AnchorMax = $"{min + chance} 1", OffsetMin = $"1 -34", OffsetMax = $"-1 -33" } } });
+            builder.Add(new CuiElement { Name = "SLOT_BAR", Parent = "AI_ADD_ARMOR_SLOT_CHANCE_BAR", Components = { new CuiRawImageComponent { Color = $"{col.r} {col.g} {col.b} {col.a}", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = $"{min} 0", AnchorMax = $"{min + chance} 1", OffsetMin = $"1 3", OffsetMax = $"-1 -35" } } });
+
+            // fail chance
+            var failChance = 1f-chance;
+            var failMiddle = chance + failChance/2;
+
+            builder.Add(new CuiLabel { Text = { Text = $"{lang.GetMessage("RANDOM", this, player.UserIDString)}", Font = "robotocondensed-bold.ttf", FontSize = 10, Align = TextAnchor.MiddleCenter, Color = "1 1 1 1" }, RectTransform = { AnchorMin = $"{chance} 1", AnchorMax = $"1 1", OffsetMin = $"0 -12", OffsetMax = $"0 0" } }, "AI_ADD_ARMOR_SLOT_CHANCE_BAR", "SLOT_TEXT" );
+            builder.Add(new CuiLabel { Text = { Text = $"{Math.Round(failChance * 100, 1)}%", Font = "robotocondensed-bold.ttf", FontSize = 10, Align = TextAnchor.MiddleCenter, Color = "1 1 1 1" }, RectTransform = { AnchorMin = $"{failMiddle} 1", AnchorMax = $"{failMiddle} 1", OffsetMin = $"-30 -26", OffsetMax = $"30 -14" } }, "AI_ADD_ARMOR_SLOT_CHANCE_BAR", "SLOT_PERCENT_TEXT" );
+            builder.Add(new CuiElement { Name = "SLOT_SPACER_1", Parent = "AI_ADD_ARMOR_SLOT_CHANCE_BAR", Components = { new CuiRawImageComponent { Color = "1 1 1 1", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = $"{failMiddle} 1", AnchorMax = $"{failMiddle} 1", OffsetMin = $"-1 -33", OffsetMax = $"0 -28" } } });
+            builder.Add(new CuiElement { Name = "SLOT_SPACER_2", Parent = "AI_ADD_ARMOR_SLOT_CHANCE_BAR", Components = { new CuiRawImageComponent { Color = "1 1 1 1", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = $"{chance} 1", AnchorMax = $"1 1", OffsetMin = $"1 -34", OffsetMax = $"-1 -33" } } });
+                
+            builder.Add(new CuiElement { Name = "SLOT_BAR", Parent = "AI_ADD_ARMOR_SLOT_CHANCE_BAR", Components = { new CuiRawImageComponent { Color = "0.969 0.922 0.882 0.055", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = $"{chance} 0", AnchorMax = $"1 1", OffsetMin = $"1 3", OffsetMax = $"-1 -35" } } });
+        }
+
+        #endregion UIBuilder:Standard
 
         #region UIBuilder:Epic
 
@@ -2544,7 +2712,7 @@ namespace Oxide.Plugins
             builder.Add(new CuiElement { Name = "PERK_BAR", Parent = "AI_PERK_CHANCE_BAR", Components = { new CuiRawImageComponent { Color = "0.969 0.922 0.882 0.055", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = $"{chanceOffset} 0", AnchorMax = $"1 1", OffsetMin = $"1 3", OffsetMax = $"-1 -35" } } });
         }
 
-        public void AdditionalCostPanel(ExtendedCuiElementContainer builder, BasePlayer player, string parent, CraftItem craftItem, int additionalCost, bool hasPayment = true)
+        public void AdditionalCostPanel(ExtendedCuiElementContainer builder, BasePlayer player, string parent, BasicCraftItem craftItem, bool hasPayment = true)
         {
             builder.Add(new CuiElement { Name = "ADDITIONAL_COST_BACKDROP", Parent = parent, Components = { new CuiRawImageComponent { Color = "0 0 0 1", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0.5 0.5", AnchorMax = "0.5 0.5", OffsetMin = $"-410 43", OffsetMax = $"-206 150" } } });
             
@@ -2552,11 +2720,11 @@ namespace Oxide.Plugins
             builder.Add(new CuiLabel { Text = { Text = lang.GetMessage("UI_ADDITIONAL_COST", this, player.UserIDString), Font = "robotocondensed-bold.ttf", FontSize = 14, Align = TextAnchor.MiddleLeft, Color = "1 1 1 1" }, RectTransform = { AnchorMin = $"0 0", AnchorMax = $"1 1", OffsetMin = $"6 0", OffsetMax = $"-6 0" } }, $"AdditionalCostHeaderPanel", "AdditionalCostHeaderPanel_Text" );
 
             builder.Add(new CuiElement { Name = $"AdditionalCostBodyPanel", Parent = "ADDITIONAL_COST_BACKDROP", Components = { new CuiRawImageComponent { Color = "0.969 0.922 0.882 0.055", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0.5 1", AnchorMax = "0.5 1", OffsetMin = $"-100 -105", OffsetMax = $"100 -23" } } });
-            
+
             builder.Add(new CuiLabel { Text = { Text = $"{craftItem.display_name?.ToUpper()}", Font = "robotocondensed-bold.ttf", FontSize = 12, Align = TextAnchor.MiddleCenter, Color = "1 1 1 1" }, RectTransform = { AnchorMin = $"0.5 1", AnchorMax = $"0.5 1", OffsetMin = $"-80 -24", OffsetMax = $"80 -4" } }, $"AdditionalCostBodyPanel", $"CurrencyName" );
             builder.Add(new CuiElement { Name = $"Currency", Parent = "AdditionalCostBodyPanel", Components = { new CuiRawImageComponent { Color = hasPayment ? "0.45098 0.55294 0.27059 0.55" : "0.969 0.922 0.882 0.22", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0.5 1", AnchorMax = "0.5 1", OffsetMin = $"-24 -72", OffsetMax = $"24 -24" } } });
             
-            var currency = ItemManager.CreateByName(craftItem.shortname, additionalCost, craftItem.skin);
+            var currency = ItemManager.CreateByName(craftItem.shortname, craftItem.amount, craftItem.skin);
             builder.AddItemIconWithAmount(new BaseItem(currency), 48f, "Currency", "CurrencyIcon");
         }
         
@@ -2684,6 +2852,8 @@ namespace Oxide.Plugins
 
         static string SELECT_PERK_BUFF_PANEL = "SELECT_PERK_BUFF_PANEL";
 
+        static string ADD_ARMOR_SLOT_PANEL = "ADD_ARMOR_SLOT_PANEL";
+
         #endregion UIBuilder:Component Names
 
 
@@ -2731,6 +2901,18 @@ namespace Oxide.Plugins
                         RectTransform = { AnchorMin = "0 0", AnchorMax = "1 1", OffsetMin = "-10 0", OffsetMax = $"-3 0" }
                     }, Name, "Amount");
 
+                if (Item.currentArmorSlots > 0)
+                {
+                    for(var i=0; i<Item.currentArmorSlots; i++)
+                    {
+                        Add(new CuiPanel
+                        {
+                            Image = { Color = "0.9 0.9 0.9 0.3" },
+                            RectTransform = { AnchorMin = "0 1", AnchorMax = $"0 1", OffsetMin = $"6 -{((5*i)+8)}", OffsetMax = $"10 -{((5*i)+4)}" }
+                        }, Name, $"{Name}_Slot_{i}");
+                    }
+                }
+
                 Add(new CuiButton {
                     Button = { Color = "0 0 0 0", Command = Command },
                     Text = { Text = " ", Font = "robotocondensed-regular.ttf", FontSize = 16, Align = TextAnchor.MiddleCenter, Color = "0 0 0 1" },
@@ -2749,6 +2931,18 @@ namespace Oxide.Plugins
                     RectTransform = { AnchorMin = "0 0", AnchorMax = "1 1", OffsetMin = "0 0", OffsetMax = "0 0" },
                 }, Parent, Name, Name);
 
+                Add(new CuiPanel
+                {
+                    Image = { Color = "0 0 0 0" },
+                    RectTransform = { AnchorMin = "0 0", AnchorMax = "1 1", OffsetMin = "0 0", OffsetMax = "0 0" },
+                }, Name, $"{Name}_BG");
+
+                Add(new CuiPanel
+                {
+                    Image = { Color = "0 0 0 0" },
+                    RectTransform = { AnchorMin = "0 0", AnchorMax = "1 1", OffsetMin = "0 0", OffsetMax = "0 0" },
+                }, Name, $"{Name}_FG");
+
                 // background for epic items
                 if (Item.buff != null && Instance.EpicLoot != null)
                 {
@@ -2762,7 +2956,7 @@ namespace Oxide.Plugins
                             new CuiOutlineComponent { Color = "0.2641509 0.2641509 0.2641509 1", Distance = $"{offset / 1.5f} {-offset / 1.5f}" },
                             new CuiRectTransformComponent { AnchorMin = "0 0", AnchorMax = "1 1", OffsetMin = $"{offset} {offset}", OffsetMax = $"{-offset} {-offset}" }
                         },
-                        Parent = Name,
+                        Parent = $"{Name}_FG",
                         Name = "EpicOutline",
                     });
                     Add(new CuiElement
@@ -2771,7 +2965,7 @@ namespace Oxide.Plugins
                             new CuiRawImageComponent { Color = $"{col.r} {col.g} {col.b} 0.5", Sprite = "assets/content/ui/tiledpatterns/stripe_thin.png" },
                             new CuiRectTransformComponent { AnchorMin = "0 0", AnchorMax = "1 1", OffsetMin = $"{offset} {offset}", OffsetMax = $"{-offset} {-offset}" }
                         },
-                        Parent = Name,
+                        Parent = $"{Name}_FG",
                         Name = "EpicBg",
                     });
                 }
@@ -2779,7 +2973,7 @@ namespace Oxide.Plugins
                 Add(new CuiPanel {
                     Image = { ItemId = Item.itemid, SkinId = Item.skin },
                     RectTransform = { AnchorMin = "0 0", AnchorMax = "1 1", OffsetMin = $"{imageOffset} {imageOffset * 1.5}", OffsetMax = $"{-imageOffset} {-imageOffset * 0.5}" }
-                }, Name, "Icon");
+                }, $"{Name}_FG", "Icon");
 
                 if (Item.perks.Count > 0 && Instance.ItemPerks != null)
                 {
@@ -2789,7 +2983,7 @@ namespace Oxide.Plugins
                             new CuiRawImageComponent { Color = "0.2641509 0.2641509 0.2641509 1", Sprite = "assets/icons/star.png" },
                             new CuiRectTransformComponent { AnchorMin = "1 0", AnchorMax = "1 0", OffsetMin = $"-24 4", OffsetMax = $"-4 24" }
                         },
-                        Parent = Name,
+                        Parent = $"{Name}_FG",
                         Name = "PerkIcon",
                     });
 
@@ -2807,10 +3001,27 @@ namespace Oxide.Plugins
                     if (!Item.named) return;
 
                     if (Item.restricted || !Instance.config.craft_settings.unveil_perk_settings.enabled || Item.perks.Count >= Instance.config.craft_settings.add_perk_settings.maxPossiblePerks)
-                        Add(new CuiElement { Components = { new CuiImageComponent { Color = "0.9 0.9 0.9 1", Sprite = "assets/icons/bp-lock.png" }, new CuiRectTransformComponent { AnchorMin = "0 0", AnchorMax = "0 0", OffsetMin = $"6 6", OffsetMax = $"24 24" } }, Parent = Name, Name = "NamedPerkIcon" });
+                        Add(new CuiElement { Components = { new CuiImageComponent { Color = "0.9 0.9 0.9 1", Sprite = "assets/icons/bp-lock.png" }, new CuiRectTransformComponent { AnchorMin = "0 0", AnchorMax = "0 0", OffsetMin = $"6 6", OffsetMax = $"24 24" } }, Parent = $"{Name}_FG", Name = "NamedPerkIcon" });
                     else
-                        Add(new CuiElement { Components = { new CuiImageComponent { Color = "0.9 0.9 0.9 1", Sprite = "assets/icons/examine.png" }, new CuiRectTransformComponent { AnchorMin = "0 0", AnchorMax = "0 0", OffsetMin = $"6 4", OffsetMax = $"26 24" } }, Parent = Name, Name = "NamedPerkIcon" });
+                        Add(new CuiElement { Components = { new CuiImageComponent { Color = "0.9 0.9 0.9 1", Sprite = "assets/icons/examine.png" }, new CuiRectTransformComponent { AnchorMin = "0 0", AnchorMax = "0 0", OffsetMin = $"6 4", OffsetMax = $"26 24" } }, Parent = $"{Name}_FG", Name = "NamedPerkIcon" });
 
+                }
+            }
+
+            public void AddItemIconWithArmorSlots(BaseItem Item, float Size, string Parent, string Name)
+            {
+                AddItemIcon(Item, Size, Parent, Name);
+
+                if (Item.currentArmorSlots > 0)
+                {
+                    for(var i=0; i<Item.currentArmorSlots; i++)
+                    {
+                        Add(new CuiPanel
+                        {
+                            Image = { Color = "0.9 0.9 0.9 0.3" },
+                            RectTransform = { AnchorMin = "0 1", AnchorMax = $"0 1", OffsetMin = $"2 -{((5*i)+8)}", OffsetMax = $"6 -{((5*i)+4)}" }
+                        }, Name, $"{Name}_Slot_{i}");
+                    }
                 }
             }
 
@@ -2931,34 +3142,6 @@ namespace Oxide.Plugins
             public string OffsetMax = "0 0";
         }
 
-        /**
-        public class CustomButton
-        {
-            [JsonProperty("Should show a custom button on the Hud? (default = false)")]
-            public bool enabled = false;
-
-            [JsonProperty("Icon shown on the button")]
-            public string Icon = "assets/icons/inventory.png";
-
-            [JsonProperty("Should we show that button on the HUD or as an Overlay?")]
-            public string Parent = "Overlay";
-
-            [JsonProperty("Brackground Color")]
-            public string BackgroundColor = "0.969 0.922 0.882 0.15";
-
-            [JsonProperty("Anchor Min")]
-            public string AnchorMin = "0.5 0";
-
-            [JsonProperty("Anchor Max")]
-            public string AnchorMax = "0.5 0";
-
-            [JsonProperty("Offset Min")]
-            public string OffsetMin = "-263 18";
-
-            [JsonProperty("Offset Max")]
-            public string OffsetMax = "-204 78";
-        }**/
-
         public class AdvancedCraftSettings
         {
             [JsonProperty("Add Perk")]
@@ -2975,6 +3158,12 @@ namespace Oxide.Plugins
 
             [JsonProperty("Unveil Perk")]
             public UnveilPerkSettings unveil_perk_settings = new UnveilPerkSettings();
+
+            [JsonProperty("Upgrade Epic Tier")]
+            public UpgradeEpicTierSettings upgrade_epic_settings = new UpgradeEpicTierSettings();
+
+            [JsonProperty("Add Armor Slots")]
+            public AddArmorSlotsSettings add_armorslots_settings = new AddArmorSlotsSettings();
         }
 
         public class AddPerkSettings
@@ -2995,7 +3184,7 @@ namespace Oxide.Plugins
             public int maxPossiblePerks = 3;
 
             [JsonProperty("Item to use when adding a perk (null = no additional costs)")]
-            public CraftItem craft_item = new CraftItem();
+            public PerkCraftItem craft_item = new PerkCraftItem();
 
             [JsonProperty("Use weighting to select a perk")]
             public WeightRolls weight_system = new WeightRolls();
@@ -3034,7 +3223,7 @@ namespace Oxide.Plugins
             public bool canRemoveAllPerks = false;
 
             [JsonProperty("Item to use when removing a perk (null = no additional costs)")]
-            public CraftItem craft_item = new CraftItem();
+            public PerkCraftItem craft_item = new PerkCraftItem();
 
             [JsonProperty("Use weighting to select a perk")]
             public WeightRolls weight_system = new WeightRolls();
@@ -3046,7 +3235,7 @@ namespace Oxide.Plugins
             public bool enabled = true;
 
             [JsonProperty("Item to use when randomizing perk values (null = no additional costs)")]
-            public CraftItem randomize_perk_item = new CraftItem();
+            public PerkCraftItem craft_item = new PerkCraftItem();
 
             [JsonProperty("Use kits to allow lucky rolls")]
             public bool allow_lucky_rolls = false;
@@ -3073,7 +3262,7 @@ namespace Oxide.Plugins
             public float downgrade_chance = 0.25f;
 
             [JsonProperty("Item to use when upgrading a perk")]
-            public CraftItem craft_item = new CraftItem();
+            public PerkCraftItem craft_item = new PerkCraftItem();
 
             [JsonProperty("Use weighting to select a perk")]
             public WeightRolls weight_system = new WeightRolls();
@@ -3085,7 +3274,7 @@ namespace Oxide.Plugins
             public bool enabled = true;
 
             [JsonProperty("Item to use when unveiling a perk")]
-            public CraftItem craft_item = new CraftItem();
+            public BasicCraftItem craft_item = new BasicCraftItem();
 
             [JsonProperty("can unveil all enabled perks (bypasses black and whitelist)")]
             public bool unrestricted = false;
@@ -3097,15 +3286,102 @@ namespace Oxide.Plugins
             public string success_effect = "assets/prefabs/misc/halloween/lootbag/effects/gold_open.prefab";
         }
 
-        public class CraftItem
+        public class UpgradeEpicTierSettings
+        {
+            [JsonProperty("enabled")]
+            public bool enabled = true;
+
+            [JsonProperty("Items to use when upgrading an epic item")]
+            public BasicCraftItem craft_item = new BasicCraftItem();
+
+            [JsonProperty("Chance that upgrading can fail (default = 25%)")]
+            public float upgrade_fail_chance = 0.25f;
+
+            [JsonProperty("Chance that epic tier will downgrade if upgrade attempt failed (default = 25%)")]
+            public float downgrade_chance = 0.25f;
+
+            [JsonProperty("Players can loose the item if lowest tier downgrades")]
+            public bool can_loose_item = true;
+
+            [JsonProperty("Player can receive a perfect S tier item")]
+            public bool can_receive_perfect_item = true;
+
+            [JsonProperty("Perfect S tier items exceed the max value by x% (default = 10%)")]
+            public float perfect_item_overruns_by = 0.1f;
+        }
+
+        public enum SlotCraftType
+        {
+            Upgrade,
+            Random
+        }
+
+        public class AddArmorSlotsSettings
+        {
+            [JsonProperty("enabled")]
+            public bool enabled = true;
+
+            [JsonProperty("craft type used for slots (Upgrade, Random)")]
+            public SlotCraftType type = SlotCraftType.Upgrade;
+
+            [JsonProperty("upgrade configurations (max 4 slots)")]
+            public Dictionary<int, SlotCraftConfig> upgrade_chances = new()
+            {
+                [1] = new SlotCraftConfig() { success_chance = 0.35f, craft_item = new BasicCraftItem() },
+                [2] = new SlotCraftConfig() { success_chance = 0.25f, craft_item = new BasicCraftItem() },
+                [3] = new SlotCraftConfig() { success_chance = 0.15f, craft_item = new BasicCraftItem() },
+                [4] = new SlotCraftConfig() { success_chance = 0.05f, craft_item = new BasicCraftItem() }
+            };
+
+            [JsonProperty("weight when random crafting (max 4 slots)")]
+            public Dictionary<int, float> random_chances = new()
+            {
+                [0] = 200f,
+                [1] = 350f,
+                [2] = 250f,
+                [3] = 150f,
+                [4] = 50f
+            };
+
+            public BasicCraftItem random_craft_item = new BasicCraftItem();
+
+            [JsonProperty("Maximum available slots for items (not listed = rust standard, max 4 slots)")]
+            public Dictionary<string, int> max_slots = new();
+        }
+
+        public class SlotCraftConfig
+        {
+            [JsonProperty("chance that adding a slot is successfull")]
+            public float success_chance;
+
+            [JsonProperty("Item to use when crafting (null = no additional costs)")]
+            public BasicCraftItem craft_item = new();
+        }
+
+        public class PerkCraftItem : BasicCraftItem
+        {
+            [JsonProperty("Additional cost per Kit consumed")]
+            public Dictionary<Perk, int> cost_per_kit = new();
+
+            public BasicCraftItem getTotalRequired(List<Perk> selectedPerks = null)
+            {
+                int amountRequired = this.amount;
+
+                if (selectedPerks == null) return new BasicCraftItem() { display_name = this.display_name, shortname = this.shortname, amount = amountRequired, skin = this.skin };
+
+                foreach (Perk perk in selectedPerks)
+                    if (this.cost_per_kit.TryGetValue(perk, out var value)) amountRequired += value;
+
+                return new BasicCraftItem() { display_name = this.display_name, shortname = this.shortname, amount = amountRequired, skin = this.skin };
+            }
+        }
+
+        public class BasicCraftItem
         {
             public string display_name = "";
             public string shortname = "scrap";
             public ulong skin = 0;
             public int amount = 100;
-
-            [JsonProperty("Additional cost per Kit consumed")]
-            public Dictionary<Perk, int> cost_per_kit = new Dictionary<Perk, int>();
         }
         #endregion
 
@@ -3357,7 +3633,7 @@ namespace Oxide.Plugins
             config.craft_settings.remove_perk_settings.weight_system.multiplier_2 = 1;
             config.craft_settings.remove_perk_settings.weight_system.multiplier_3 = 2;
 
-            config.craft_settings.randomize_perk_settings.randomize_perk_item.amount = 25;
+            config.craft_settings.randomize_perk_settings.craft_item.amount = 25;
 
             config.craft_settings.upgrade_perk_settings.weight_system.multiplier_1 = 1;
             config.craft_settings.upgrade_perk_settings.weight_system.multiplier_2 = 2;
@@ -3369,7 +3645,7 @@ namespace Oxide.Plugins
 
                 config.craft_settings.add_perk_settings.craft_item.cost_per_kit.Add(perk, 0);
                 config.craft_settings.remove_perk_settings.craft_item.cost_per_kit.Add(perk, 0);
-                config.craft_settings.randomize_perk_settings.randomize_perk_item.cost_per_kit.Add(perk, 0);
+                config.craft_settings.randomize_perk_settings.craft_item.cost_per_kit.Add(perk, 0);
                 config.craft_settings.upgrade_perk_settings.craft_item.cost_per_kit.Add(perk, 0);
             }
 
