@@ -11,6 +11,7 @@ using System.Linq;
 using System.Text;
 
 using UnityEngine;
+using static Oxide.Plugins.AdvancedItemCrafting;
 
 /**
  * This plugin will not do anything standalone.
@@ -381,6 +382,7 @@ namespace Oxide.Plugins
                 itemToEnhance = itemToEnhance.SplitItem(1);
 
             EpicLoot?.Call<string>("GenerateItem", player, selectedBuff.ToString(), new List<string> { itemToEnhance.info.shortname }, null, true, itemToEnhance);
+            itemToEnhance.SetItemOwnership(lang.GetMessage("OWNERSHIP_TAG_EPIC", this), GetOwnershipHeader(player));
 
             // refeshing inventory to remove payments and show the new item
             var playerState = new PlayerState(player);
@@ -738,6 +740,7 @@ namespace Oxide.Plugins
 
             itemToMod.text = perkString;
             itemToMod.text += "[named]";
+            itemToMod.SetItemOwnership(lang.GetMessage("OWNERSHIP_TAG_LEGENDARY", this), GetOwnershipHeader(player) + GetPerkOwnershipDescription(itemToMod));
             itemToMod.MarkDirty();
 
             if (config.craft_settings.unveil_perk_settings.success_effect != null)
@@ -799,6 +802,7 @@ namespace Oxide.Plugins
                 itemToMod.name = $"{perkConfig.enhancementSettings.item_name_prefix} {itemToMod.info.displayName?.english}";
             
             itemToMod.text = perkString;
+            itemToMod.SetItemOwnership(lang.GetMessage("OWNERSHIP_TAG_PERK", this), GetOwnershipHeader(player) + GetPerkOwnershipDescription(itemToMod));
             itemToMod.MarkDirty();
 
             return true;
@@ -874,6 +878,7 @@ namespace Oxide.Plugins
                 itemToMod.name = $"{perkConfig.enhancementSettings.item_name_prefix} {itemToMod.info.displayName?.english}";
 
             itemToMod.text = perkString;
+            itemToMod.SetItemOwnership(lang.GetMessage("OWNERSHIP_TAG_PERK", this), GetOwnershipHeader(player) + GetPerkOwnershipDescription(itemToMod));
             itemToMod.MarkDirty();
 
             if (config.craft_settings.add_perk_settings.weight_system.success_effect != null && (selectedPerks.Count == 0 || (selectedPerks.Count > 0 && selectedPerks.Contains(perkToAdd))))
@@ -924,6 +929,7 @@ namespace Oxide.Plugins
                 perkString += $"[{perk.Perk} {perk.Value}]";
             }
             itemToMod.text = perkString;
+            itemToMod.SetItemOwnership(lang.GetMessage("OWNERSHIP_TAG_PERK", this), GetOwnershipHeader(player) + GetPerkOwnershipDescription(itemToMod));
             itemToMod.MarkDirty();
 
             return true;
@@ -989,6 +995,7 @@ namespace Oxide.Plugins
                 perkString += $"[{perk.Perk} {perk.Value}]";
             }
             itemToMod.text = perkString;
+            itemToMod.SetItemOwnership(lang.GetMessage("OWNERSHIP_TAG_PERK", this), GetOwnershipHeader(player) + GetPerkOwnershipDescription(itemToMod));
             itemToMod.MarkDirty();
 
             if (config.craft_settings.remove_perk_settings.weight_system.success_effect != null && (selectedPerks.Count == 0 || (selectedPerks.Count > 0 && selectedPerks.Contains(perkToRemove))))
@@ -1045,12 +1052,31 @@ namespace Oxide.Plugins
             }
 
             itemToMod.text = perkString;
+            itemToMod.SetItemOwnership(lang.GetMessage("OWNERSHIP_TAG_PERK", this), GetOwnershipHeader(player) + GetPerkOwnershipDescription(itemToMod));
             itemToMod.MarkDirty();
 
             if (config.craft_settings.randomize_perk_settings.success_effect != null)
                 EffectNetwork.Send(new Effect(config.craft_settings.randomize_perk_settings.success_effect, player.transform.position, player.transform.position), player.net.connection);
 
             return true;
+        }
+
+        public string GetOwnershipHeader(BasePlayer player) => string.Format(lang.GetMessage("OWNERSHIP_DESCRIPTION_HEADER", this), lang.GetMessage("OWNERSHIP_CREATED", this), player?.displayName);
+
+        public string GetPerkOwnershipDescription(Item item)
+        {
+            List<PerkEntry> perks = new BaseItem(item).perks;
+
+            // FIXME: we want to keep the original creator of the item.
+
+            string perkString = string.Empty;
+            foreach(var perk in perks)
+            {
+                string perkName = lang.GetMessage("UI" + perk.Perk.ToString(), ItemPerks);
+                perkString += string.Format(lang.GetMessage("OWNERSHIP_DESCRIPTION_PERK_LINE", this), perkName, GetPerkValue(perk.Value, perk.Perk), GetPerkTypeString(perk.Perk));
+            }
+
+            return string.Format(lang.GetMessage("OWNERSHIP_DESCRIPTION_PERKS", this), perkString);
         }
 
         public bool HasKits(BasePlayer player, Dictionary<Perk, int> requiredAmount)
@@ -1988,7 +2014,7 @@ namespace Oxide.Plugins
                 foreach (var perk in playerState.activePerkBuffs.OrderBy(p => p.Key.ToString()))
                 {
                     var col = GetColorFromHtml("#077E93");
-
+                    
                     innerContainer.Add(new CuiElement { Name = $"BonusDescription{perk.Key.ToString()}", Parent = "AI_PLAYER_BUFFS_DETAILS", Components = { new CuiRawImageComponent { Color = "0.969 0.922 0.882 0.055", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0 1", AnchorMax = "0.3 1", OffsetMin = $"10 -{23 + offset}", OffsetMax = $"0 -{offset}" } } });
                     innerContainer.Add(new CuiLabel { Text = { Text = lang.GetMessage("UI" + perk.Key.ToString(), ItemPerks, player.UserIDString), Font = "robotocondensed-bold.ttf", FontSize = 12, Align = TextAnchor.MiddleLeft, Color = $"{col.r} {col.g} {col.b} {col.a}" }, RectTransform = { AnchorMin = $"0 0", AnchorMax = $"1 1", OffsetMin = $"3 0", OffsetMax = $"-3 0" } }, $"BonusDescription{perk.Key.ToString()}", $"BonusDescription_Text{perk.Key.ToString()}" );
 
@@ -3508,7 +3534,18 @@ namespace Oxide.Plugins
 
                 ["UI_ADDITIONAL_COST"] = "Additional Cost",
                 ["UI_KITSELECTION"] = "Available Kits",
-                ["UI_KITSELECTION_NONE"] = "No Kits found"
+                ["UI_KITSELECTION_NONE"] = "No Kits found",
+                
+                ["OWNERSHIP_TAG_LEGENDARY"] = "A legendary enhanced item",
+                ["OWNERSHIP_TAG_PERK"] = "An enhanced item",
+                ["OWNERSHIP_TAG_EPIC"] = "An Epic Loot item",
+                
+                ["OWNERSHIP_DESCRIPTION_HEADER"] = "{0} by {1}",
+
+                ["OWNERSHIP_DESCRIPTION_PERKS"] = "\nPerks:\n{0}",
+                ["OWNERSHIP_DESCRIPTION_PERK_LINE"] = "- {0}: +{1}{2}\n",
+
+                ["OWNERSHIP_CREATED"] = "Created"
             };
 
             lang.RegisterMessages(langDict, this);
