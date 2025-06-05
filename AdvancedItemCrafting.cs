@@ -2013,13 +2013,18 @@ namespace Oxide.Plugins
 
                 foreach (var perk in playerState.activePerkBuffs.OrderBy(p => p.Key.ToString()))
                 {
+                    PerkSettings perkMods;
+                    if (!perkConfig.enhancementSettings.perk_settings.TryGetValue(perk.Key, out perkMods)) continue;
+
                     var col = GetColorFromHtml("#077E93");
+                    var value = perkMods.perk_cap > 0 && perkMods.perk_cap < perk.Value ? $"{GetPerkValue(perkMods.perk_cap, perk.Key)}{GetPerkTypeString(perk.Key)} <color=#dd0000>[{GetPerkValue(perk.Value, perk.Key)}{GetPerkTypeString(perk.Key)}]</color>" : $"{GetPerkValue(perk.Value, perk.Key)}{GetPerkTypeString(perk.Key)}";
+
                     
                     innerContainer.Add(new CuiElement { Name = $"BonusDescription{perk.Key.ToString()}", Parent = "AI_PLAYER_BUFFS_DETAILS", Components = { new CuiRawImageComponent { Color = "0.969 0.922 0.882 0.055", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0 1", AnchorMax = "0.3 1", OffsetMin = $"10 -{23 + offset}", OffsetMax = $"0 -{offset}" } } });
                     innerContainer.Add(new CuiLabel { Text = { Text = lang.GetMessage("UI" + perk.Key.ToString(), ItemPerks, player.UserIDString), Font = "robotocondensed-bold.ttf", FontSize = 12, Align = TextAnchor.MiddleLeft, Color = $"{col.r} {col.g} {col.b} {col.a}" }, RectTransform = { AnchorMin = $"0 0", AnchorMax = $"1 1", OffsetMin = $"3 0", OffsetMax = $"-3 0" } }, $"BonusDescription{perk.Key.ToString()}", $"BonusDescription_Text{perk.Key.ToString()}" );
 
                     innerContainer.Add(new CuiElement { Name = $"BonusDescription{perk.Key.ToString()}", Parent = "AI_PLAYER_BUFFS_DETAILS", Components = { new CuiRawImageComponent { Color = "0.969 0.922 0.882 0.055", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "0.3 1", AnchorMax = "1 1", OffsetMin = $"0 -{23 + offset}", OffsetMax = $"-50 -{offset}" } } });
-                    innerContainer.Add(new CuiLabel { Text = { Text = $"{GetPerkValue(perk.Value, perk.Key)}{GetPerkTypeString(perk.Key)}", Font = "robotocondensed-bold.ttf", FontSize = 12, Align = TextAnchor.MiddleLeft, Color = "1 1 1 1" }, RectTransform = { AnchorMin = $"0 0", AnchorMax = $"1 1", OffsetMin = $"3 0", OffsetMax = $"-3 0" } }, $"BonusDescription{perk.Key.ToString()}", $"BonusDescription_Text{perk.Key.ToString()}" );
+                    innerContainer.Add(new CuiLabel { Text = { Text = $"{ value }", Font = "robotocondensed-bold.ttf", FontSize = 12, Align = TextAnchor.MiddleLeft, Color = "1 1 1 1" }, RectTransform = { AnchorMin = $"0 0", AnchorMax = $"1 1", OffsetMin = $"3 0", OffsetMax = $"-3 0" } }, $"BonusDescription{perk.Key.ToString()}", $"BonusDescription_Text{perk.Key.ToString()}" );
             
                     innerContainer.Add(new CuiElement { Name = $"BonusDescriptionBtn{perk.Key.ToString()}", Parent = "AI_PLAYER_BUFFS_DETAILS", Components = { new CuiRawImageComponent { Color = "0.969 0.922 0.882 0.055", Sprite = "assets/content/ui/ui.background.tiletex.psd" }, new CuiRectTransformComponent { AnchorMin = "1 1", AnchorMax = "1 1", OffsetMin = $"-50 -{23 + offset}", OffsetMax = $"-10 -{offset}" } } });
                     innerContainer.Add(new CuiPanel { Image = { Color = "1 1 1 1", Sprite = "assets/icons/info.png" }, RectTransform = { AnchorMin = "0 0.5", AnchorMax = "0 0.5", OffsetMin = $"8 -8", OffsetMax = $"24 8" } }, $"BonusDescriptionBtn{perk.Key.ToString()}", $"BonusDescriptionBtn{perk.Key.ToString()}_ICON");
