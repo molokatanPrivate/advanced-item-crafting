@@ -35,7 +35,7 @@ using UnityEngine;
  **/
 namespace Oxide.Plugins
 {
-    [Info("AdvancedItemCrafting", "molokatan", "1.0.5"), Description("User Interface and advanced crafting options for Item Perks and Epic Loot")]
+    [Info("AdvancedItemCrafting", "molokatan", "1.0.6"), Description("User Interface and advanced crafting options for Item Perks and Epic Loot")]
     class AdvancedItemCrafting : RustPlugin
     {
         [PluginReference]
@@ -1327,7 +1327,8 @@ namespace Oxide.Plugins
                 shortname = item.info.shortname;
 
                 amount = item.amount;
-                ammoCount = item.ammoCount;
+                // FIXME: this is just a quickfix for the wipe. If we want to show the amount in future, we should fix it
+                ammoCount = null;
 
                 if (item.hasCondition)
                 {
