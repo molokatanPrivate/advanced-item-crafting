@@ -11,6 +11,7 @@ using System.Linq;
 using System.Text;
 
 using UnityEngine;
+using Facepunch;
 
 /**
  * This plugin will not do anything standalone.
@@ -35,7 +36,7 @@ using UnityEngine;
  **/
 namespace Oxide.Plugins
 {
-    [Info("AdvancedItemCrafting", "molokatan", "1.0.6"), Description("User Interface and advanced crafting options for Item Perks and Epic Loot")]
+    [Info("AdvancedItemCrafting", "molokatan", "1.0.7"), Description("User Interface and advanced crafting options for Item Perks and Epic Loot")]
     class AdvancedItemCrafting : RustPlugin
     {
         [PluginReference]
@@ -1223,7 +1224,10 @@ namespace Oxide.Plugins
         int ItemAmountAvailable(BasePlayer player, string shortname, ulong skin, string name)
         {
             var definition = ItemManager.FindItemDefinition(shortname);
-            var items = player.inventory.FindItemsByItemID(definition.itemid);
+
+            var items = Pool.Get<List<Item>>();
+            player.inventory.FindItemsByItemID(items, definition.itemid);
+
             var result = 0;
             foreach (var item in items)
             {
@@ -1232,6 +1236,9 @@ namespace Oxide.Plugins
                 if (string.IsNullOrEmpty(name) ? string.IsNullOrEmpty(item.name) : name == item.name)
                     result += item.amount;
             }
+
+            Pool.FreeUnmanaged(ref items);
+
             return result;
         }
 
@@ -1253,7 +1260,10 @@ namespace Oxide.Plugins
             if (ItemAmountAvailable(player, shortname, skin, name) < amount) return false;
             
             var definition = ItemManager.FindItemDefinition(shortname);
-            var items = player.inventory.FindItemsByItemID(definition.itemid);
+
+            var items = Pool.Get<List<Item>>();
+            player.inventory.FindItemsByItemID(items, definition.itemid);
+
             var amountLeft = amount;
 
             foreach (var item in items)
@@ -1272,6 +1282,9 @@ namespace Oxide.Plugins
 
                 if (amountLeft <= 0) break;
             }
+
+            Pool.FreeUnmanaged(ref items);
+
             return true;
         }
 
@@ -1751,11 +1764,16 @@ namespace Oxide.Plugins
                 default: return Math.Round(mod * 100, 2);
             }
         }
-        
+
+
         public Dictionary<Perk, int> getAvailableKits(BasePlayer player)
         {            
             var definition = ItemManager.FindItemDefinition(perkConfig.enhancementSettings.enhancement_kit_settings.shortname);
-            var found = player.inventory.FindItemsByItemID(definition.itemid).Where((source, index) => source.skin == perkConfig.enhancementSettings.enhancement_kit_settings.skin && source.name.StartsWith(perkConfig.enhancementSettings.enhancement_kit_settings.displayName, StringComparison.OrdinalIgnoreCase));
+
+            var inventoryItems = Pool.Get<List<Item>>();
+            player.inventory.FindItemsByItemID(inventoryItems, definition.itemid);
+
+            var found = inventoryItems.Where((source, index) => source.skin == perkConfig.enhancementSettings.enhancement_kit_settings.skin && source.name.StartsWith(perkConfig.enhancementSettings.enhancement_kit_settings.displayName, StringComparison.OrdinalIgnoreCase));
 
             Dictionary<Perk, int> available = new Dictionary<Perk, int>();
             foreach (var kit in found)
@@ -1765,6 +1783,9 @@ namespace Oxide.Plugins
                     available[perk] = 0;
                 available[perk] = kit.amount + available[perk];
             }
+
+            Pool.FreeUnmanaged(ref inventoryItems);
+
             return available;
         }
         
