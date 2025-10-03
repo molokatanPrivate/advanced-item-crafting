@@ -36,7 +36,7 @@ using Facepunch;
  **/
 namespace Oxide.Plugins
 {
-    [Info("AdvancedItemCrafting", "molokatan", "1.0.7"), Description("User Interface and advanced crafting options for Item Perks and Epic Loot")]
+    [Info("AdvancedItemCrafting", "molokatan", "1.0.8"), Description("User Interface and advanced crafting options for Item Perks and Epic Loot")]
     class AdvancedItemCrafting : RustPlugin
     {
         [PluginReference]
@@ -1681,8 +1681,9 @@ namespace Oxide.Plugins
             // Instant skinning
             TreePlanter, // Tree regrowth when cut down ++
             RockCycler, // Node respawn when mined out ++
-            BradleyDamage,
-            HeliDamage,
+            BradleyDamage, // Deals additional damage to bradley
+            HeliDamage, // Deals additional damage to heli
+            Thorns, // Reflects a % of damage back to the attacker
         }
 
         public class PerkEntry
