@@ -36,7 +36,7 @@ using Facepunch;
  **/
 namespace Oxide.Plugins
 {
-    [Info("AdvancedItemCrafting", "molokatan", "1.0.8"), Description("User Interface and advanced crafting options for Item Perks and Epic Loot")]
+    [Info("AdvancedItemCrafting", "molokatan", "1.0.9"), Description("User Interface and advanced crafting options for Item Perks and Epic Loot")]
     class AdvancedItemCrafting : RustPlugin
     {
         [PluginReference]
@@ -1437,7 +1437,10 @@ namespace Oxide.Plugins
                     InventoryItems.Add(mainItem.uid.ToString(), new BaseItem(mainItem));
 
                 foreach(var wearItem in player.inventory.containerWear.itemList)
+                {
+                    if (wearItem.position > 7) continue;
                     WearItems.Add(wearItem.uid.ToString(), new BaseItem(wearItem));
+                }
 
                 foreach (var beltItem in player.inventory.containerBelt.itemList)
                     BeltItems.Add(beltItem.uid.ToString(), new BaseItem(beltItem));
