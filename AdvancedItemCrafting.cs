@@ -36,7 +36,7 @@ using Facepunch;
  **/
 namespace Oxide.Plugins
 {
-    [Info("AdvancedItemCrafting", "molokatan", "1.0.8"), Description("User Interface and advanced crafting options for Item Perks and Epic Loot")]
+    [Info("AdvancedItemCrafting", "molokatan", "1.0.9"), Description("User Interface and advanced crafting options for Item Perks and Epic Loot")]
     class AdvancedItemCrafting : RustPlugin
     {
         [PluginReference]
@@ -245,7 +245,7 @@ namespace Oxide.Plugins
             var player = arg.Player();
             if (player == null) return;
             
-            string setting = arg.Args[0];
+            string setting = arg.GetString(0);
 
             switch (setting)
             {
@@ -285,7 +285,7 @@ namespace Oxide.Plugins
             var player = arg.Player();
             if (player == null) return;
 
-            uint selectedItemUID = Convert.ToUInt32(arg.Args[0]);
+            uint selectedItemUID = arg.GetUInt(0);
 
             var item = player.inventory.FindItemByUID(new ItemId(selectedItemUID));
             if (item == null) return;
@@ -325,15 +325,15 @@ namespace Oxide.Plugins
             var player = arg.Player();
             if (player == null) return;
 
-            uint selectedItemUID = Convert.ToUInt32(arg.Args[0]);
+            uint selectedItemUID = arg.GetUInt(0);
             
             var item = player.inventory.FindItemByUID(new ItemId(selectedItemUID));
             if (item == null) return;
             
             var selectedBuff = Buff.None;
-            if (!Enum.TryParse(arg.Args[1], out selectedBuff)) return;
+            if (!Enum.TryParse(arg.GetString(1), out selectedBuff)) return;
 
-            var opened = Convert.ToBoolean(arg.Args[2]);
+            var opened = arg.GetBool(2);
 
             var baseItem = new BaseItem(item);
             
@@ -363,13 +363,13 @@ namespace Oxide.Plugins
 
             CuiHelper.DestroyUi(player, EPIC_BUFF_DETAILS_PANEL);
 
-            var selectedItemUID = Convert.ToUInt64(arg.Args[0]);
+            var selectedItemUID = arg.GetUInt64(0);
             var itemToEnhance = player.inventory.FindItemByUID(new ItemId(selectedItemUID));
 
             if (itemToEnhance == null) return;
             
             var selectedBuff = Buff.None;
-            if (!Enum.TryParse(arg.Args[1], out selectedBuff)) return;
+            if (!Enum.TryParse(arg.GetString(1), out selectedBuff)) return;
 
             int cost;
             if(selectedBuff == Buff.None || !epicConfig.scrapper_settings.enhancement_cost.TryGetValue(selectedBuff, out cost)) return;
@@ -419,7 +419,7 @@ namespace Oxide.Plugins
             var player = arg.Player();
             if (player == null) return;
 
-            var selectedItemUID = Convert.ToUInt64(arg.Args[0]);
+            var selectedItemUID = arg.GetUInt64(0);
             var itemToSalvage = player.inventory.FindItemByUID(new ItemId(selectedItemUID));
 
             if (itemToSalvage == null) return;
@@ -461,14 +461,14 @@ namespace Oxide.Plugins
             var player = arg.Player();
             if (player == null) return;
 
-            var selectedItemUID = Convert.ToUInt64(arg.Args[0]);
+            var selectedItemUID = arg.GetUInt64(0);
 
             var itemToMod = player.inventory.FindItemByUID(new ItemId(selectedItemUID));
             if (itemToMod == null) return;
 
-            string action = arg.Args[1];
+            string action = arg.GetString(1);
 
-            var selectedPerks = CLI.Deserialize<List<Perk>>(arg.Args[2]);
+            var selectedPerks = CLI.Deserialize<List<Perk>>(arg.GetString(2));
             
             BaseItem baseItem = new BaseItem(itemToMod);
 
@@ -513,7 +513,7 @@ namespace Oxide.Plugins
             
             if (arg.Args.Count() > 0)
             {
-                var selectedItemUID = Convert.ToUInt64(arg.Args[0]);
+                var selectedItemUID = arg.GetUInt64(0);
                 var itemToMod = player.inventory.FindItemByUID(new ItemId(selectedItemUID));
                 var baseItem = new BaseItem(itemToMod);
                 CreateItemDetailsBase(builder, player, baseItem);
@@ -532,7 +532,7 @@ namespace Oxide.Plugins
             var player = arg.Player();
             if (player == null) return;
 
-            var selectedItemUID = Convert.ToUInt64(arg.Args[0]);
+            var selectedItemUID = arg.GetUInt64(0);
 
             var itemToMod = player.inventory.FindItemByUID(new ItemId(selectedItemUID));
             if (itemToMod == null) return;
@@ -564,12 +564,12 @@ namespace Oxide.Plugins
             var player = arg.Player();
             if (player == null) return;
 
-            var selectedItemUID = Convert.ToUInt64(arg.Args[0]);
+            var selectedItemUID = arg.GetUInt64(0);
 
             var itemToMod = player.inventory.FindItemByUID(new ItemId(selectedItemUID));
             if (itemToMod == null) return;
 
-            var selectedPerks = CLI.Deserialize<List<Perk>>(arg.Args[1]);
+            var selectedPerks = CLI.Deserialize<List<Perk>>(arg.GetString(1));
 
             if (IsWeightedAction(player, "cmdaddperk"))
             {
@@ -601,12 +601,12 @@ namespace Oxide.Plugins
             var player = arg.Player();
             if (player == null) return;
 
-            var selectedItemUID = Convert.ToUInt64(arg.Args[0]);
+            var selectedItemUID = arg.GetUInt64(0);
 
             var itemToMod = player.inventory.FindItemByUID(new ItemId(selectedItemUID));
             if (itemToMod == null) return;
 
-            var selectedPerks = CLI.Deserialize<List<Perk>>(arg.Args[1]);
+            var selectedPerks = CLI.Deserialize<List<Perk>>(arg.GetString(1));
             
             if (!RandomizePerkValues(player, itemToMod, selectedPerks)) return;
 
@@ -620,12 +620,12 @@ namespace Oxide.Plugins
             var player = arg.Player();
             if (player == null) return;
 
-            var selectedItemUID = Convert.ToUInt64(arg.Args[0]);
+            var selectedItemUID = arg.GetUInt64(0);
 
             var itemToMod = player.inventory.FindItemByUID(new ItemId(selectedItemUID));
             if (itemToMod == null) return;
 
-            var selectedPerks = CLI.Deserialize<List<Perk>>(arg.Args[1]);
+            var selectedPerks = CLI.Deserialize<List<Perk>>(arg.GetString(1));
             
             if (IsWeightedAction(player, "cmdremoveperk"))
             {
@@ -655,7 +655,7 @@ namespace Oxide.Plugins
             if (player == null) return;
 
             var perk = Perk.None;
-            if (!Enum.TryParse(arg.Args[0], out perk)) return;
+            if (!Enum.TryParse(arg.GetString(0), out perk)) return;
 
             var builder = new ExtendedCuiElementContainer();
             
