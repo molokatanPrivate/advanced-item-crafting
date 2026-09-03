@@ -36,7 +36,7 @@ using Facepunch;
  **/
 namespace Oxide.Plugins
 {
-    [Info("AdvancedItemCrafting", "molokatan", "1.0.9"), Description("User Interface and advanced crafting options for Item Perks and Epic Loot")]
+    [Info("AdvancedItemCrafting", "molokatan", "1.0.10"), Description("User Interface and advanced crafting options for Item Perks and Epic Loot")]
     class AdvancedItemCrafting : RustPlugin
     {
         [PluginReference]
@@ -1684,6 +1684,7 @@ namespace Oxide.Plugins
             BradleyDamage, // Deals additional damage to bradley
             HeliDamage, // Deals additional damage to heli
             Thorns, // Reflects a % of damage back to the attacker
+            TurretDamage, // Deals additional damage to auto turrets
         }
 
         public class PerkEntry
