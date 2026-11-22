@@ -34,9 +34,17 @@ using Facepunch;
  * - Admin Inventory Inspector -> to look into players inventory and validate items
  * - dont show costs if permission "free" is assigned -> maybe alternate text?
  **/
+/* 1.0.11
+ * Added support for the new Epic Loot sets (Ranchers, Wranglers, Herders) and Item Perks perks (Rancher, Wrangler, Herder). Without this the Epic Loot and Item Perks configs failed to load.
+ * New perks are added to the kit cost tables automatically so they can be configured.
+ * Add, remove, randomize, unveil, salvage and epic enhancement now check permissions and item eligibility server-side.
+ * Fixed an error when salvaging an item without an epic buff.
+ * A broken config file is no longer overwritten with defaults.
+ */
+
 namespace Oxide.Plugins
 {
-    [Info("AdvancedItemCrafting", "molokatan", "1.0.10"), Description("User Interface and advanced crafting options for Item Perks and Epic Loot")]
+    [Info("AdvancedItemCrafting", "molokatan", "1.0.11"), Description("User Interface and advanced crafting options for Item Perks and Epic Loot")]
     class AdvancedItemCrafting : RustPlugin
     {
         [PluginReference]
@@ -359,7 +367,7 @@ namespace Oxide.Plugins
         void CmdConfirmEpicSelection(ConsoleSystem.Arg arg)
         {
             var player = arg.Player();
-            if (player == null) return;
+            if (player == null || !permission.UserHasPermission(player.UserIDString, perm_enhance)) return;
 
             CuiHelper.DestroyUi(player, EPIC_BUFF_DETAILS_PANEL);
 
@@ -370,6 +378,9 @@ namespace Oxide.Plugins
             
             var selectedBuff = Buff.None;
             if (!Enum.TryParse(arg.GetString(1), out selectedBuff)) return;
+
+            var candidate = new BaseItem(itemToEnhance);
+            if (!CanReceiveEpicBuff(candidate) || !GetAvailableEpicBuffsForItem(candidate).Contains(selectedBuff)) return;
 
             int cost;
             if(selectedBuff == Buff.None || !epicConfig.scrapper_settings.enhancement_cost.TryGetValue(selectedBuff, out cost)) return;
@@ -417,7 +428,7 @@ namespace Oxide.Plugins
         void CmdSalvageEpicItem(ConsoleSystem.Arg arg)
         {
             var player = arg.Player();
-            if (player == null) return;
+            if (player == null || !permission.UserHasPermission(player.UserIDString, perm_salvage)) return;
 
             var selectedItemUID = arg.GetUInt64(0);
             var itemToSalvage = player.inventory.FindItemByUID(new ItemId(selectedItemUID));
@@ -425,6 +436,7 @@ namespace Oxide.Plugins
             if (itemToSalvage == null) return;
 
             var baseItem = new BaseItem(itemToSalvage);
+            if (baseItem.buff == null) return;
 
             int amount;
             if (!epicConfig.scrapper_settings.scrapper_value.TryGetValue(baseItem.buff.Tier, out amount)) return;
@@ -530,12 +542,15 @@ namespace Oxide.Plugins
         void CmdUnveilPerk(ConsoleSystem.Arg arg)
         {
             var player = arg.Player();
-            if (player == null) return;
+            if (player == null || !config.craft_settings.unveil_perk_settings.enabled || !permission.UserHasPermission(player.UserIDString, perm_named_unveil)) return;
 
             var selectedItemUID = arg.GetUInt64(0);
 
             var itemToMod = player.inventory.FindItemByUID(new ItemId(selectedItemUID));
             if (itemToMod == null) return;
+
+            var target = new BaseItem(itemToMod);
+            if (!target.named || target.restricted || !CanUnveilPerkBuff(target)) return;
             
             if (!UnveilPerk(player, itemToMod))
                 return;
@@ -562,7 +577,7 @@ namespace Oxide.Plugins
         void CmdAddPerk(ConsoleSystem.Arg arg)
         {
             var player = arg.Player();
-            if (player == null) return;
+            if (player == null || !config.craft_settings.add_perk_settings.enabled || !permission.UserHasPermission(player.UserIDString, perm_perk_add)) return;
 
             var selectedItemUID = arg.GetUInt64(0);
 
@@ -570,6 +585,11 @@ namespace Oxide.Plugins
             if (itemToMod == null) return;
 
             var selectedPerks = CLI.Deserialize<List<Perk>>(arg.GetString(1));
+            if (selectedPerks == null) return;
+
+            var target = new BaseItem(itemToMod);
+            if (target.named || !CanReceivePerkBuff(target)) return;
+            if (!IsWeightedAction(player, "cmdaddperk") && selectedPerks.Count == 0) return;
 
             if (IsWeightedAction(player, "cmdaddperk"))
             {
@@ -599,7 +619,7 @@ namespace Oxide.Plugins
         void CmdRandomizePerkValues(ConsoleSystem.Arg arg)
         {
             var player = arg.Player();
-            if (player == null) return;
+            if (player == null || !config.craft_settings.randomize_perk_settings.enabled || !permission.UserHasPermission(player.UserIDString, perm_perk_randomize)) return;
 
             var selectedItemUID = arg.GetUInt64(0);
 
@@ -607,6 +627,10 @@ namespace Oxide.Plugins
             if (itemToMod == null) return;
 
             var selectedPerks = CLI.Deserialize<List<Perk>>(arg.GetString(1));
+            if (selectedPerks == null) return;
+
+            var target = new BaseItem(itemToMod);
+            if (target.named || target.perks.Count == 0) return;
             
             if (!RandomizePerkValues(player, itemToMod, selectedPerks)) return;
 
@@ -618,7 +642,7 @@ namespace Oxide.Plugins
         void CmdRemovePerk(ConsoleSystem.Arg arg)
         {
             var player = arg.Player();
-            if (player == null) return;
+            if (player == null || !config.craft_settings.remove_perk_settings.enabled || !permission.UserHasPermission(player.UserIDString, perm_perk_remove)) return;
 
             var selectedItemUID = arg.GetUInt64(0);
 
@@ -626,6 +650,11 @@ namespace Oxide.Plugins
             if (itemToMod == null) return;
 
             var selectedPerks = CLI.Deserialize<List<Perk>>(arg.GetString(1));
+            if (selectedPerks == null) return;
+
+            var target = new BaseItem(itemToMod);
+            if (target.named || !CanRemovePerkBuff(target)) return;
+            if (!IsWeightedAction(player, "cmdremoveperk") && selectedPerks.Count == 0) return;
             
             if (IsWeightedAction(player, "cmdremoveperk"))
             {
@@ -1556,7 +1585,10 @@ namespace Oxide.Plugins
             BulletProof, // Reduces damage from bullets.
             FishingRodModifier, // Adjusts the tensile strenght of the cast rod
             UncannyDodge, // Chance to dodge projectiles and receive no damage 
-            MaxHealth // Increases the max health of the player.
+            MaxHealth, // Increases the max health of the player.
+            Ranchers,
+            Wranglers,
+            Herders
         }
 
         public class EpicEntry
@@ -1685,6 +1717,9 @@ namespace Oxide.Plugins
             HeliDamage, // Deals additional damage to heli
             Thorns, // Reflects a % of damage back to the attacker
             TurretDamage, // Deals additional damage to auto turrets
+            Rancher,
+            Wrangler,
+            Herder,
         }
 
         public class PerkEntry
@@ -3369,10 +3404,23 @@ namespace Oxide.Plugins
             }
             catch (Exception ex)
             {
-                Puts($"Configuration file {Name}.json is invalid; using defaults");
+                PrintError($"Configuration file {Name}.json is invalid; using defaults without saving. {ex.Message}");
                 LoadDefaultConfig();
+                return;
             }
+            AddMissingPerkCosts();
             SaveConfig();
+        }
+
+        void AddMissingPerkCosts()
+        {
+            foreach (Perk perk in Enum.GetValues(typeof(Perk)))
+            {
+                if (perk == Perk.None) continue;
+                var tables = new[] { config.craft_settings.add_perk_settings.craft_item.cost_per_kit, config.craft_settings.remove_perk_settings.craft_item.cost_per_kit, config.craft_settings.randomize_perk_settings.randomize_perk_item.cost_per_kit, config.craft_settings.upgrade_perk_settings.craft_item.cost_per_kit };
+                foreach (var table in tables)
+                    if (table != null && !table.ContainsKey(perk)) table[perk] = 0;
+            }
         }
 
         protected override void SaveConfig()
@@ -3455,9 +3503,10 @@ namespace Oxide.Plugins
                 
                 GetPerkEnhanceableItems();
             }
-            catch
+            catch(Exception ex)
             {
                 Puts($"Configuration file ItemPerks.json not found. Please fix your setup.");
+                Puts($"Error description: {ex.Message}. Stack trace: {ex.StackTrace}");
                 Interface.Oxide.UnloadPlugin(Name);
             }
         }
